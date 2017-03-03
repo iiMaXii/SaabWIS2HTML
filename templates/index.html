@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>Saab WIS</title>
+        
+        <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+        <link href="{{ url_for('static', filename='css/bootstrap-treeview.css') }}" rel="stylesheet">
+        <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+        <script src="{{ url_for('static', filename='js/jquery-3.1.1.min.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/bootstrap-treeview.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    </head>
+    <body>
+
+        <div class="row">
+            <div class="col-md-4" style="background:#eee">
+                <div id="treeview1"></div>
+            </div>
+            <div class="col-md-8">
+              <ul class="nav nav-tabs" role="tablist" id="tab-menu"></ul>
+              <div class="tab-content" id="tab-content"></div>
+            </div>
+        </div>
+
+
+        <div class="modal fade" id="myModal" role="dialog">
+            <div class="modal-dialog">
+
+            <!-- Modal content-->
+               <!-- <button type="button" class="close" data-dismiss="modal">&times;</button>-->
+                <span class="close" data-dismiss="modal">&times;</span>
+                <img class="modal-content" id="img01" style="max-width:100%">
+                <!--<div class="modal-content">
+                    <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                    <h4 class="modal-title">Modal Header</h4>
+                    </div>
+                    <div class="modal-body">
+                    <img class="modal-content" id="img01" style="max-width:75%">
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-default" data-dismiss="modal">Close</button></div>
+                </div>-->
+
+            </div>
+        </div>
+
+        <!--<div id="myModal" class="modal">
+            <span class="close" onclick="document.getElementById('myModal').style.display='none'">&times;</span>
+
+            <img class="modal-content" id="img01">
+
+            <div id="caption"></div>
+        </div>-->
+
+    </body>
+</html>
