@@ -4,3 +4,4 @@ This program re-packages the code of Saab Workshop Information System (WIS) to a
 
 # Other
 * https://www.coolutils.com/TotalCADConverter
+* http://loading.io/ Attribute loading icon

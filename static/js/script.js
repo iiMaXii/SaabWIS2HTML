@@ -58,7 +58,6 @@ $( document ).ready(function() {
 		      console.log('Loading doc'+data['data-id']+' into tab'+id)
 		      console.log("/static/data/se/doc"+data['data-id']+".html");
 		      $('#tab-content-'+id).load("/static/data/se/doc"+data['data-id']+".html", function() {
-		        console.log("Enabling img modal");
 		        var modal = document.getElementById('myModal');
 		        var modalImg = document.getElementById("img01");
 		        $('#tab-content-'+id+' img').click(function() {
@@ -66,7 +65,7 @@ $( document ).ready(function() {
  		          modal.style.display = "block";
 		          modalImg.src = this.src;
 		          $("#myModal").modal();
-		        });
+		        }).css('cursor', 'pointer');
 		      });
 
 		    }

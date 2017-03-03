@@ -19,3 +19,13 @@
     font-size: 40px;
     font-weight: bold;
 }
+
+#img01 {
+    cursor: pointer;
+}
+
+img {
+    border: 1px #ccc solid;
+    background: url('/static/img/loading.svg') no-repeat;
+    background-position: center;
+}
