@@ -33,11 +33,22 @@ replacements = {
 # Regular expression so we can reformat to proper HTML
 warning_regex = re.compile("<TABLE bgcolor='white' border='0' style='border-bottom: red 1px solid; border-top: red 1px solid;border-right: red 1px solid;border-left: red 1px solid;' cellspacing='1' rules='none' width='60%'><TR><TD>\s+<TABLE bgcolor='white' border='0' style='border-bottom: red 3px solid; border-top: red 3px solid;border-right: red 3px solid;border-left: red 3px solid;' cellspacing='1' rules='none' width='100%'><TR><TD>\s+<TABLE bgcolor='ffdddd' border='0' style='border-bottom: red 1px solid; border-top: red 1px solid;border-right: red 1px solid;border-left: red 1px solid;' cellspacing='0' rules='none' width='100%'><TR align='center'><TD height='60' style='color:red;font-weight:bold;font-size:10pt;font-family:Verdana;'><IMG Src='attention.gif'>&nbsp;(.*?)</TD></TR><TR><TD><TABLE width='97%' style='margin-left:5pt;'>\s+<TR><TD style='font-family:Verdana;color:black;font-size:10pt;' colspan='3'><P style='margin-bottom:5pt;'>(.*?)</P></TD></TR>\s+</TABLE></TD></TR><TR><TD height='10'></TD></TR></TABLE>\s+</TD>\s+</TR>\s+</TABLE>\s+</TD>\s+</TR>\s+</TABLE>")
 observe_regex = re.compile("<TABLE frame='hsides' bordercolor='#000000' cellspacing='0' cellpadding='5' rules='none' width='60%' bgcolor='f8f8f8'><TR><TD colspan='3' height='30' style='color:blue;font-weight:bold;font-size:10pt;font-family:Verdana;'>(.*?)</TD></TR>\s+<TR><TD colspan='3' style='font-family:Verdana;color:black;font-size:10pt;'><P style='margin-bottom:5pt;'>(.*?)</P></TD></TR>\s+<TR><TD height='10' colspan='3'></TD></TR></TABLE>")
+note_regex = re.compile("<TABLE frame='void' rules='none' width='60%' bgcolor='f8f8f8'><TR><TD style='color:green;font-weight:bold;font-size:10pt;' colspan='3'>(.*?)</TD></TR>\s+(<TR><TD style='font-family:Verdana;color:black;font-size:10pt;' colspan='3'><P style='margin-bottom:5pt;'>(.*?)</P></TD></TR>\s+)+</TABLE>")
+note_row_regex = re.compile("<TR><TD style='font-family:Verdana;color:black;font-size:10pt;' colspan='3'><P style='margin-bottom:5pt;'>(.*?)</P></TD></TR>")
+
 h1_regex = re.compile("<TABLE width='100%' border='0' bgcolor='#6699cc' cellspacing='0' cellpadding='0' style='margin-left:0pt;'><TR><TD style='border-bottom: black 0px solid; border-top: #99ccff 0px solid;border-right: #99ccff 0px solid;border-left: #99ccff 0px solid;font-size:12pt;color:white;font-weight:bold;padding-bottom:1px;padding-top:1px;' align='left' width='27' height='25'>&nbsp;</TD><TD style='border-bottom: black 0px solid; border-top: #99ccff 0px solid;border-right: #99ccff 0px solid;border-left: #99ccff 0px solid;font-size:10pt;color:white;font-weight:bold;padding-bottom:1px;padding-top:1px;' align='left'>(.*?)</TD></TR></TABLE>")
 reference_regex = re.compile("<A NAME=\"(\d+)\"></a><a name='s(\d+)'></a>")
 h2_regex = re.compile("<TABLE width='92%' border='0' bgcolor='#6699cc' cellspacing='0' cellpadding='0' style='margin-left:-3pt;'><TR><TD style='border-bottom: black 0px solid; border-top: #99ccff 0px solid;border-right: #99ccff 0px solid;border-left: #99ccff 0px solid;font-size:10pt;color:white;font-weight:bold;padding-bottom:1px;padding-top:1px;' align='left'>&nbsp;(.*?)</TD></TR></TABLE>")
 h3_regex = re.compile("<H2 style='font-size:10pt;margin-top:12pt;'>(.*?)</H2>")
 
+ul_dot_regex = re.compile("(<SPAN style='position:relative'><TABLE border='0' width='90%'><TR><TD width='20' valign='top' style='font-family:Verdana;color:black;font-size:10pt;'>&bull;</TD><TD colspan='2' style='font-family:Verdana;color:black;font-size:10pt;'>.*?</TD></TR></TABLE></SPAN>\s+)+", re.DOTALL)
+ul_dot_li_regex = re.compile("<SPAN style='position:relative'><TABLE border='0' width='90%'><TR><TD width='20' valign='top' style='font-family:Verdana;color:black;font-size:10pt;'>&bull;</TD><TD colspan='2' style='font-family:Verdana;color:black;font-size:10pt;'>(.*?)</TD></TR></TABLE></SPAN>", re.DOTALL)
+
+ul_regex = re.compile("(<SPAN style='position:relative'><TABLE border='0' width='90%'><TR><TD width='20' valign='top' style='font-family:Verdana;color:black;font-size:10pt;'>-</TD><TD colspan='2' style='font-family:Verdana;color:black;font-size:10pt;'>.*?</TD></TR></TABLE></SPAN>\s+)+", re.DOTALL)
+ul_li_regex = re.compile("<SPAN style='position:relative'><TABLE border='0' width='90%'><TR><TD width='20' valign='top' style='font-family:Verdana;color:black;font-size:10pt;'>-</TD><TD colspan='2' style='font-family:Verdana;color:black;font-size:10pt;'>(.*?)</TD></TR></TABLE></SPAN>", re.DOTALL)
+
+ol_regex = re.compile("(<SPAN style='position:relative'><TABLE border='0' width='90%'><TR><TD width='20' valign='top' style='font-family:Verdana;color:black;font-size:8pt;'>\d+\.</TD><TD colspan='2' style='font-family:Verdana;color:black;font-size:8pt;'>.*?</TD></TR></TABLE></SPAN>\s+)+", re.DOTALL)
+ol_li_regex = re.compile("<SPAN style='position:relative'><TABLE border='0' width='90%'><TR><TD width='20' valign='top' style='font-family:Verdana;color:black;font-size:8pt;'>(\d+)\.</TD><TD colspan='2' style='font-family:Verdana;color:black;font-size:8pt;'>(.*?)</TD></TR></TABLE></SPAN>", re.DOTALL)
 
 img_extensions = {}
 for f in os.listdir(IMG_DIRECTORY):
@@ -54,7 +65,7 @@ doc_count = 0
 
 dt_start = datetime.datetime.now()
 
-#doc_files = ['static/data/se/doc30070.htm']
+doc_files = ['static/data/se/doc43727.htm']
 
 # TODO view-source:http://127.0.0.1:5000/static/data/se/doc26075.html
 # html tag ends before text
@@ -73,7 +84,20 @@ for file_path in sorted(doc_files):
         source = source.replace(old, new)
 
     source = warning_regex.sub('<div class="alert alert-danger"><h4 class="alert-heading">\g<1></h4><p>\g<2></p></div>', source)
-    source = observe_regex.sub('<div class="alert alert-info"><h4 class="alert-heading">\g<1></h4> \g<2></div>', source)
+    source = observe_regex.sub('<div class="alert alert-info"><h4 class="alert-heading">\g<1></h4><p>\g<2></p></div>', source)
+
+    while True:
+        note = note_regex.search(source)
+        if not note:
+            break
+
+        note_html = '<div class="alert alert-success"><h4 class="alert-heading">{}</h4>'.format(note.group(1))
+        for note_row in re.finditer(note_row_regex, note.group(0)):
+            note_html += '<p>{}</p>'.format(note_row.group(1))
+
+        note_html += '</div>'
+
+        source = source[:note.start()] + note_html + source[note.end():]
 
     # Extract value for page title
     for heading in re.finditer(h1_regex, source):
@@ -88,8 +112,55 @@ for file_path in sorted(doc_files):
     source = h2_regex.sub('<h2>\g<1></h2>', source)
     source = h3_regex.sub('<h3>\g<1></h3>', source)
 
+    while True:
+        ul = re.search(ul_dot_regex, source)
+        if not ul:
+            break
 
-    soup = BeautifulSoup(source, 'html.parser')
+        print('ul wop')
+        ul_html = '<ul>'
+        for li in re.finditer(ul_dot_li_regex, ul.group(0)):
+            ul_html += '<li>{}</li>'.format(li.group(1))
+        ul_html += '</ul>'
+
+        source = source[:ul.start()] + ul_html + source[ul.end():]
+
+    while True:
+        ul = re.search(ul_regex, source)
+        if not ul:
+            break
+
+        print('ul wop')
+        ul_html = '<ul>'
+        for li in re.finditer(ul_li_regex, ul.group(0), re.DOTALL):
+            ul_html += '<li>{}</li>'.format(li.group(1))
+        ul_html += '</ul>'
+
+        source = source[:ul.start()] + ul_html + source[ul.end():]
+
+    while True:
+        ol = re.search(ol_regex, source)
+        if not ol:
+            break
+
+        ol_li_count = 1
+        ol_html = '<ol>'
+        for li in re.finditer(ol_li_regex, ol.group(0)):
+            if ol_li_count != int(li.group(1)):
+                if int(li.group(1)) == 1:
+                    ol_html += '</ol><ol>'
+                else:
+                    print('Error: Unable to parse ordered list')
+                    break
+
+            ol_html += '<li>{}</li>'.format(li.group(2))
+
+            ol_li_count += 1
+        ol_html += '</ol>'
+
+        source = source[:ol.start()] + ol_html + source[ol.end():]
+
+    soup = BeautifulSoup(source, 'html5lib')
 
     # Error if we find any script
     if soup.find('script'):
@@ -97,13 +168,15 @@ for file_path in sorted(doc_files):
               .format(file_path))
         sys.exit()
 
+    for p in soup.find_all('p'):
+        if p.attrs == {'style': 'margin-top:3pt;margin-bottom;10pt;'}:
+            del p['style']
 
-    # Replace warning img with bootstrap warning glyph icon (obsolete)
-    #for img in soup.find_all('img'):
-    #    if img['src'] == 'attention.gif':
-    #        glyph_icon = soup.new_tag('span')
-    #        glyph_icon['class'] = 'glyphicon glyphicon-warning-sign'
-    #        img.replace_with(glyph_icon)
+    for img in soup.find_all('img'):
+        if img['src'] == 'link.gif':
+            glyph_icon = soup.new_tag('span')
+            glyph_icon['class'] = 'glyphicon glyphicon-link'
+            img.replace_with(glyph_icon)
 
     # Remove span tags with style=position:relative
     for span in soup.find_all('span'):
