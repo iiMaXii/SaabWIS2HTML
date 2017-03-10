@@ -1,5 +1,55 @@
 var submenus = {};
+
+var active_item = -1;
 var active_tab = -1;
+var active_tab_item = -1;
+
+
+/*
+ * När man klickar på treeview länk (menu och submenu) och open_doc() open_sub_doc()
+ *  - Spara Y scroll
+ *  - Spara menu id, tab id, submenu_id
+ */
+function History() {
+  this.data = [];
+  this.pos = -1;
+
+  this.add = function(item, tab, sub_item) {
+    if (this.pos + 1 != this.data.length) {
+      this.data.splice(this.pos + 1, this.data.length - this.pos);
+    }
+
+    this.data.push({
+      item: item,
+      tab: tab,
+      sub_item: sub_item,
+      scroll_top: 0,
+    });
+
+    this.pos++;
+  };
+
+  this.previous = function() {
+    if (this.pos <= 0) {
+      return -1;
+    }
+
+    this.data[this.pos].scroll_top = $('body').scrollTop();
+
+    return this.data[--this.pos];
+  };
+
+  this.next = function() {
+    if (this.pos + 1 == this.data.length) {
+      return -1;
+    }
+
+    this.data[this.pos].scroll_top = $('body').scrollTop();
+
+    return this.data[++this.pos];
+  };
+}
+
 
 $(document).ready(function() {
   console.log('Loading tabs.json');
@@ -7,7 +57,7 @@ $(document).ready(function() {
     console.log('Got tabs.json');
     $.each(data, function (index, data) {
         $('#tab-menu').append('<li id="tab-'+data.id+'" class="nav-item disabled"><a class="nav-link" data-toggle="tab" href="#tab-pane-'+data.id+'" role="tab">'+data.name+'</a></li>');
-        $('#tab-content').append('<div class="tab-pane active" id="tab-pane-'+data.id+'" role="tabpanel"><div id="tab-content-'+data.id+'" role="tab-content"></div><div id="tab-tree-'+data.id+'" role="tab-submenu-tree"></div></div>');
+        $('#tab-content').append('<div class="tab-pane" id="tab-pane-'+data.id+'" role="tabpanel"><div id="tab-content-'+data.id+'" role="tab-content"></div><div id="tab-tree-'+data.id+'" role="tab-submenu-tree"></div></div>');
     })
   });
 
@@ -32,7 +82,7 @@ $(document).ready(function() {
             $(this).treeview('remove');
           }
         });
-        $('div[role=tabpanel]').removeClass('active');
+        //$('div[role=tabpanel]').removeClass('active');
 
         $.each(submenus[submenu_identifier], function(id, value) {
 		  $('#tab-tree-'+id).treeview({
@@ -83,6 +133,8 @@ function open_doc(document_identifier) {
   }
   console.log('Loading doc'+document_identifier+' into tab'+active_tab)
   $('#tab-content-'+active_tab).load("/static/data/se/doc"+document_identifier+".html", function() {
+    $('html,body').scrollTop(0);
+
     var modal = document.getElementById('myModal');
     var modalImg = document.getElementById("img01");
     $('#tab-content-'+active_tab+' img').click(function() {

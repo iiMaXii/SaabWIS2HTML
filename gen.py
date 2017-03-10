@@ -51,16 +51,9 @@ for f in glob.glob(os.path.join(DIRECTORY, MODEL, "package", language_code.lower
 
 from bs4 import BeautifulSoup
 import os
-import codecs
-import collections
 import json
 
-if not os.path.exists(OUTPUT_DIRECTORY):
-    os.mkdir(OUTPUT_DIRECTORY)
-
 soup = BeautifulSoup(open('C:/Users/iiMaXii/PycharmProjects/SaabWIS2HTML/static/data/views/9-5 (9600)2006se.xml', 'r'), 'html.parser')
-
-# print(soup.prettify())
 
 print("carmodel    : ", soup.modelyear['carmodel'])
 print("modelnumber : ", soup.modelyear['modelnumber'])
@@ -70,9 +63,13 @@ print("language    : ", soup.modelyear['language'])
 language_code = soup.modelyear['language']
 
 OUTPUT_DIRECTORY = os.path.join(OUTPUT_DIRECTORY, language_code.lower(), 'index')
+TMP_DIRECTORY = 'tmp'
 
 if not os.path.exists(OUTPUT_DIRECTORY):
     os.mkdir(OUTPUT_DIRECTORY)
+
+if not os.path.exists(TMP_DIRECTORY):
+    os.mkdir(TMP_DIRECTORY)
 
 tree_data = []
 
@@ -82,9 +79,14 @@ tabs = []
 # output_2 = codecs.open(os.path.join(OUTPUT_DIRECTORY, sc_id + '.html'), 'w', 'utf-8')
 submenus = {}
 
+link_ref = {}
+link_subref = {}
+links = {}
+
 for sct in soup.findAll('sct'):
     tree_data.append({
         'text': sct.find('name').contents[0],
+        'selectable': False,
         'nodes': [],
     })
 
@@ -104,19 +106,24 @@ for sct in soup.findAll('sct'):
             submenus[sc_id][sit['num']] = []
 
             for sie in sit.findAll('sie'):
+                link_ref[sie['id']] = sie['docid']
 
                 children = []
 
-                sie_elements = sie.findAll('sisub')
-                if sie_elements:
-                    for sisub in sie.findAll('sisub'):
-                        sisub_name_contents = sisub.find('name').contents  # name tag might be empty for unkown reason
-                        sisub_name = sisub_name_contents[0] if sisub_name_contents else 'null'
+                # Get links
+                for link in sie.find_all('link'):
+                    links.setdefault(sie['docid'], {})[link['linkid']] = link['dest']
 
-                        children.append({
-                            'data-id': sisub['sisubid'],
-                            'text': sisub_name,
-                        })
+                for sisub in sie.find_all('sisub'):
+                    link_subref[sisub['id']] = (sie['docid'], sisub['sisubid'])
+
+                    sisub_name_contents = sisub.find('name').contents  # name tag might be empty for unkown reason
+                    sisub_name = sisub_name_contents[0] if sisub_name_contents else 'null'
+
+                    children.append({
+                        'data-id': sisub['sisubid'],
+                        'text': sisub_name,
+                    })
 
                 submenu = {
                     'data-id': sie['docid'],
@@ -141,3 +148,12 @@ with open(os.path.join(OUTPUT_DIRECTORY, 'tabs.json'), 'w') as outfile:
 
 with open(os.path.join(OUTPUT_DIRECTORY, 'submenus.json'), 'w') as outfile:
     json.dump(submenus, outfile)
+
+with open(os.path.join(TMP_DIRECTORY, 'links.json'), 'w') as outfile:
+    json.dump(links, outfile)
+
+with open(os.path.join(TMP_DIRECTORY, 'link_ref.json'), 'w') as outfile:
+    json.dump(link_ref, outfile)
+
+with open(os.path.join(TMP_DIRECTORY, 'link_subref.json'), 'w') as outfile:
+    json.dump(link_subref, outfile)

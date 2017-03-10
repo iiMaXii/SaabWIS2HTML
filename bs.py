@@ -11,6 +11,7 @@ import os
 import htmlmin
 import datetime
 import re
+import json
 
 from bs4 import BeautifulSoup
 from bs4 import Doctype
@@ -29,6 +30,27 @@ replacements = {
     '<SCRIPT LANGUAGE="JavaScript">GetImagePosLeft();</SCRIPT>': '<DIV>',
     '<SCRIPT LANGUAGE="JavaScript">\n\tfunction GetIEVersion()\n\t{\n\t\tmsieIndex = navigator.appVersion.indexOf("MSIE") + 5;\n\t\tvar floatVersion = parseFloat(navigator.appVersion.substr(msieIndex,3));\n\t\treturn floatVersion;\n\t}\n\tfunction GetImagePosLeft()\n\t{\n\t\tvar IEVersion = GetIEVersion();\n\t\tif (IEVersion > 5.01)\n\t\t\tdocument.write("<DIV style=\'position:absolute;left:-20;top:0\'>");\n\t\telse\n\t\t\tdocument.write("<DIV style=\'position:absolute;left:0;top:0\'>");\n\t}\n\t</SCRIPT>': '',
 }
+
+# Read links
+links = None
+link_ref = None
+link_subref = None
+
+try:
+    f = open('tmp/links.json')
+    links = json.load(f)
+
+    f = open('tmp/link_ref.json')
+    link_ref = json.load(f)
+
+    f = open('tmp/link_subref.json')
+    link_subref = json.load(f)
+except (IOError, OSError) as e:
+    pass
+
+if not links or not link_ref or not link_subref:
+    print('Error: Please run gen.py first')
+    sys.exit()
 
 # Regular expression so we can reformat to proper HTML
 warning_regex = re.compile("<TABLE bgcolor='white' border='0' style='border-bottom: red 1px solid; border-top: red 1px solid;border-right: red 1px solid;border-left: red 1px solid;' cellspacing='1' rules='none' width='60%'><TR><TD>\s+<TABLE bgcolor='white' border='0' style='border-bottom: red 3px solid; border-top: red 3px solid;border-right: red 3px solid;border-left: red 3px solid;' cellspacing='1' rules='none' width='100%'><TR><TD>\s+<TABLE bgcolor='ffdddd' border='0' style='border-bottom: red 1px solid; border-top: red 1px solid;border-right: red 1px solid;border-left: red 1px solid;' cellspacing='0' rules='none' width='100%'><TR align='center'><TD height='60' style='color:red;font-weight:bold;font-size:10pt;font-family:Verdana;'><IMG Src='attention.gif'>&nbsp;(.*?)</TD></TR><TR><TD><TABLE width='97%' style='margin-left:5pt;'>\s+<TR><TD style='font-family:Verdana;color:black;font-size:10pt;' colspan='3'><P style='margin-bottom:5pt;'>(.*?)</P></TD></TR>\s+</TABLE></TD></TR><TR><TD height='10'></TD></TR></TABLE>\s+</TD>\s+</TR>\s+</TABLE>\s+</TD>\s+</TR>\s+</TABLE>")
@@ -75,6 +97,7 @@ for file_path in sorted(doc_files):
     print('Processing {} ({} of {})'.format(file_path, doc_count,
                                             len(doc_files)))
 
+    doc_id = os.path.splitext(os.path.basename(file_path))[0][3:]
     doc_title = None
 
     with open(file_path) as f:
@@ -197,9 +220,22 @@ for file_path in sorted(doc_files):
             #print('No contents in a tag. Removing')
             #link.extract()
         elif link['href'].startswith('wisref://'):
-            doc_id = link['href'][10:]
+            link_ref_id = link['href'][10:]
+            link_real_ref = links[doc_id][link_ref_id]
+
             link['href'] = 'javascript:void(0)'
-            link['onclick'] = 'open_doc({})'.format(doc_id)
+
+            # Is this a reference to a doc
+            if link_real_ref in link_ref:
+                link['onclick'] = 'open_doc({})'.format(link_ref[link_real_ref])
+            # Is this a reference to part of a doc
+            elif link_real_ref in link_subref:
+                link['onclick'] = 'open_sub_doc({}, {})'.format(link_real_ref[link_real_ref][0], link_real_ref[link_real_ref][1])
+            else:
+                print('Error: Unable to follow reference id={}'.format(link_real_ref))
+                sys.exit()
+
+
         elif link['href'].startswith('wisimg://'):
             img_count += 1
             img_id = link['href'][10:]
