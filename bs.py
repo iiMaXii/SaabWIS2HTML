@@ -58,14 +58,17 @@ if not links or not link_ref or not link_subref:
 
 # Regular expression so we can reformat to proper HTML
 warning_regex = re.compile("<TABLE bgcolor='white' border='0' style='border-bottom: red 1px solid; border-top: red 1px solid;border-right: red 1px solid;border-left: red 1px solid;' cellspacing='1' rules='none' width='60%'><TR><TD>\s+<TABLE bgcolor='white' border='0' style='border-bottom: red 3px solid; border-top: red 3px solid;border-right: red 3px solid;border-left: red 3px solid;' cellspacing='1' rules='none' width='100%'><TR><TD>\s+<TABLE bgcolor='ffdddd' border='0' style='border-bottom: red 1px solid; border-top: red 1px solid;border-right: red 1px solid;border-left: red 1px solid;' cellspacing='0' rules='none' width='100%'><TR align='center'><TD height='60' style='color:red;font-weight:bold;font-size:10pt;font-family:Verdana;'><IMG Src='attention.gif'>&nbsp;(.*?)</TD></TR><TR><TD><TABLE width='97%' style='margin-left:5pt;'>\s*<TR><TD style='font-family:Verdana;color:black;font-size:10pt;' colspan='3'><P style='margin-bottom:5pt;'>(.*?)</P></TD></TR>\s*</TABLE></TD></TR><TR><TD height='10'></TD></TR></TABLE>\s+</TD>\s+</TR>\s+</TABLE>\s+</TD>\s+</TR>\s+</TABLE>", re.DOTALL)
-observe_regex = re.compile("<TABLE frame='hsides' bordercolor='#000000' cellspacing='0' cellpadding='5' rules='none' width='60%' bgcolor='f8f8f8'><TR><TD colspan='3' height='30' style='color:blue;font-weight:bold;font-size:10pt;font-family:Verdana;'>(.*?)</TD></TR>\s+<TR><TD colspan='3' style='font-family:Verdana;color:black;font-size:10pt;'><P style='margin-bottom:5pt;'>(.*?)</P></TD></TR>\s+<TR><TD height='10' colspan='3'></TD></TR></TABLE>", re.DOTALL)
+
+observe_regex = re.compile("<TABLE frame='hsides' bordercolor='#000000' cellspacing='0' cellpadding='5' rules='none' width='60%' bgcolor='f8f8f8'><TR><TD colspan='3' height='30' style='color:blue;font-weight:bold;font-size:10pt;font-family:Verdana;'>(.*?)</TD></TR>\s*(<TR><TD colspan='3' style='font-family:Verdana;color:black;font-size:10pt;'><P style='margin-bottom:5pt;'>(.*?)</P></TD></TR>\s*)+<TR><TD height='10' colspan='3'></TD></TR></TABLE>", re.DOTALL)
+observe_row_regex = re.compile("<TR><TD colspan='3' style='font-family:Verdana;color:black;font-size:10pt;'><P style='margin-bottom:5pt;'>(.*?)</P></TD></TR>", re.DOTALL)
+
 note_regex = re.compile("<TABLE frame='void' rules='none' width='60%' bgcolor='f8f8f8'><TR><TD style='color:green;font-weight:bold;font-size:10pt;' colspan='3'>(.*?)</TD></TR>\s+(<TR><TD style='font-family:Verdana;color:black;font-size:10pt;' colspan='3'><P style='margin-bottom:5pt;'>(.*?)</P></TD></TR>\s+)+</TABLE>", re.DOTALL)
 note_row_regex = re.compile("<TR><TD style='font-family:Verdana;color:black;font-size:10pt;' colspan='3'><P style='margin-bottom:5pt;'>(.*?)</P></TD></TR>", re.DOTALL)
 
-h1_regex = re.compile("<TABLE width='100%' border='0' bgcolor='#6699cc' cellspacing='0' cellpadding='0' style='margin-left:0pt;'><TR><TD style='border-bottom: black 0px solid; border-top: #99ccff 0px solid;border-right: #99ccff 0px solid;border-left: #99ccff 0px solid;font-size:12pt;color:white;font-weight:bold;padding-bottom:1px;padding-top:1px;' align='left' width='27' height='25'>&nbsp;</TD><TD style='border-bottom: black 0px solid; border-top: #99ccff 0px solid;border-right: #99ccff 0px solid;border-left: #99ccff 0px solid;font-size:10pt;color:white;font-weight:bold;padding-bottom:1px;padding-top:1px;' align='left'>(.*?)</TD></TR></TABLE>")
+h1_regex = re.compile("<TABLE width='100%' border='0' bgcolor='#6699cc' cellspacing='0' cellpadding='0' style='margin-left:0pt;'><TR><TD style='border-bottom: black 0px solid; border-top: #99ccff 0px solid;border-right: #99ccff 0px solid;border-left: #99ccff 0px solid;font-size:12pt;color:white;font-weight:bold;padding-bottom:1px;padding-top:1px;' align='left' width='27' height='25'>&nbsp;</TD><TD style='border-bottom: black 0px solid; border-top: #99ccff 0px solid;border-right: #99ccff 0px solid;border-left: #99ccff 0px solid;font-size:10pt;color:white;font-weight:bold;padding-bottom:1px;padding-top:1px;' align='left'>(.*?)</TD></TR></TABLE>", re.DOTALL)
 reference_regex = re.compile("<A NAME=\"(\d+)\"></a><a name='s(\d+)'></a>")
-h2_regex = re.compile("<TABLE width='92%' border='0' bgcolor='#6699cc' cellspacing='0' cellpadding='0' style='margin-left:-3pt;'><TR><TD style='border-bottom: black 0px solid; border-top: #99ccff 0px solid;border-right: #99ccff 0px solid;border-left: #99ccff 0px solid;font-size:10pt;color:white;font-weight:bold;padding-bottom:1px;padding-top:1px;' align='left'>&nbsp;(.*?)</TD></TR></TABLE>")
-h3_regex = re.compile("<H2 style='font-size:10pt;margin-top:12pt;'>(.*?)</H2>")
+h2_regex = re.compile("<TABLE width='92%' border='0' bgcolor='#6699cc' cellspacing='0' cellpadding='0' style='margin-left:-3pt;'><TR><TD style='border-bottom: black 0px solid; border-top: #99ccff 0px solid;border-right: #99ccff 0px solid;border-left: #99ccff 0px solid;font-size:10pt;color:white;font-weight:bold;padding-bottom:1px;padding-top:1px;' align='left'>&nbsp;(.*?)</TD></TR></TABLE>", re.DOTALL)
+h3_regex = re.compile("<H2 style='font-size:10pt;margin-top:12pt;'>(.*?)</H2>", re.DOTALL)
 
 ul_dot_regex = re.compile("(<SPAN style='position:relative'><TABLE border='0' width='90%'><TR><TD width='20' valign='top' style='font-family:Verdana;color:black;font-size:10pt;'>&bull;</TD><TD colspan='2' style='font-family:Verdana;color:black;font-size:10pt;'>.*?</TD></TR></TABLE></SPAN>\s+)+", re.DOTALL)
 ul_dot_li_regex = re.compile("<SPAN style='position:relative'><TABLE border='0' width='90%'><TR><TD width='20' valign='top' style='font-family:Verdana;color:black;font-size:10pt;'>&bull;</TD><TD colspan='2' style='font-family:Verdana;color:black;font-size:10pt;'>(.*?)</TD></TR></TABLE></SPAN>", re.DOTALL)
@@ -82,7 +85,7 @@ for f in os.listdir(IMG_DIRECTORY):
         filename, extension = f.rsplit('.', 1)
         img_extensions[filename] = extension
 
-#doc_list = [48161]
+doc_list = [16610]
 
 #doc_files = [f for f in glob(os.path.join(DIRECTORY, "doc[0-9]*.htm"))]
 doc_files = [os.path.join(DIRECTORY, 'doc{}.htm'.format(doc_id))
@@ -115,7 +118,21 @@ for file_path in sorted(doc_files):
         source = source.replace(old, new)
 
     source = warning_regex.sub('<div class="alert alert-danger"><h4 class="alert-heading">\g<1></h4><p>\g<2></p></div>', source)
-    source = observe_regex.sub('<div class="alert alert-info"><h4 class="alert-heading">\g<1></h4><p>\g<2></p></div>', source)
+    #source = observe_regex.sub('<div class="alert alert-info"><h4 class="alert-heading">\g<1></h4><p>\g<2></p></div>', source)
+
+    while True:
+        observe = observe_regex.search(source)
+        if not observe:
+            break
+        print('observe')
+        observe_html = '<div class="alert alert-info"><h4 class="alert-heading">{}</h4>'.format(observe.group(1))
+        for observe_row in re.finditer(observe_row_regex, observe.group(0)):
+            print('wop')
+            observe_html += '<p>{}</p>'.format(observe_row.group(1))
+
+        observe_html += '</div>'
+
+        source = source[:observe.start()] + observe_html + source[observe.end():]
 
     while True:
         note = note_regex.search(source)
@@ -182,7 +199,13 @@ for file_path in sorted(doc_files):
                     ol_html += '</ol><ol>'
                 else:
                     print('Error: Unable to parse ordered list')
+                    print(ol_li_count, li.group(1))
+
                     break
+
+            #if ol_li_count == 12:
+            #    print(li.group(2))
+            #    sys.exit()
 
             ol_html += '<li>{}</li>'.format(li.group(2))
 
