@@ -79,6 +79,7 @@ tabs = []
 # output_2 = codecs.open(os.path.join(OUTPUT_DIRECTORY, sc_id + '.html'), 'w', 'utf-8')
 submenus = {}
 
+doc_list = []
 link_ref = {}
 link_subref = {}
 links = {}
@@ -106,6 +107,8 @@ for sct in soup.findAll('sct'):
             submenus[sc_id][sit['num']] = []
 
             for sie in sit.findAll('sie'):
+                doc_list.append(sie['docid'])
+
                 link_ref[sie['id']] = sie['docid']
 
                 children = []
@@ -148,6 +151,10 @@ with open(os.path.join(OUTPUT_DIRECTORY, 'tabs.json'), 'w') as outfile:
 
 with open(os.path.join(OUTPUT_DIRECTORY, 'submenus.json'), 'w') as outfile:
     json.dump(submenus, outfile)
+
+# Temporary files
+with open(os.path.join(TMP_DIRECTORY, 'doc_list.json'), 'w') as outfile:
+    json.dump(doc_list, outfile)
 
 with open(os.path.join(TMP_DIRECTORY, 'links.json'), 'w') as outfile:
     json.dump(links, outfile)

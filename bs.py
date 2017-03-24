@@ -32,11 +32,15 @@ replacements = {
 }
 
 # Read links
+doc_list = []
 links = None
 link_ref = None
 link_subref = None
 
 try:
+    f = open('tmp/doc_list.json')
+    doc_list = json.load(f)
+
     f = open('tmp/links.json')
     links = json.load(f)
 
@@ -53,10 +57,10 @@ if not links or not link_ref or not link_subref:
     sys.exit()
 
 # Regular expression so we can reformat to proper HTML
-warning_regex = re.compile("<TABLE bgcolor='white' border='0' style='border-bottom: red 1px solid; border-top: red 1px solid;border-right: red 1px solid;border-left: red 1px solid;' cellspacing='1' rules='none' width='60%'><TR><TD>\s+<TABLE bgcolor='white' border='0' style='border-bottom: red 3px solid; border-top: red 3px solid;border-right: red 3px solid;border-left: red 3px solid;' cellspacing='1' rules='none' width='100%'><TR><TD>\s+<TABLE bgcolor='ffdddd' border='0' style='border-bottom: red 1px solid; border-top: red 1px solid;border-right: red 1px solid;border-left: red 1px solid;' cellspacing='0' rules='none' width='100%'><TR align='center'><TD height='60' style='color:red;font-weight:bold;font-size:10pt;font-family:Verdana;'><IMG Src='attention.gif'>&nbsp;(.*?)</TD></TR><TR><TD><TABLE width='97%' style='margin-left:5pt;'>\s+<TR><TD style='font-family:Verdana;color:black;font-size:10pt;' colspan='3'><P style='margin-bottom:5pt;'>(.*?)</P></TD></TR>\s+</TABLE></TD></TR><TR><TD height='10'></TD></TR></TABLE>\s+</TD>\s+</TR>\s+</TABLE>\s+</TD>\s+</TR>\s+</TABLE>")
-observe_regex = re.compile("<TABLE frame='hsides' bordercolor='#000000' cellspacing='0' cellpadding='5' rules='none' width='60%' bgcolor='f8f8f8'><TR><TD colspan='3' height='30' style='color:blue;font-weight:bold;font-size:10pt;font-family:Verdana;'>(.*?)</TD></TR>\s+<TR><TD colspan='3' style='font-family:Verdana;color:black;font-size:10pt;'><P style='margin-bottom:5pt;'>(.*?)</P></TD></TR>\s+<TR><TD height='10' colspan='3'></TD></TR></TABLE>")
-note_regex = re.compile("<TABLE frame='void' rules='none' width='60%' bgcolor='f8f8f8'><TR><TD style='color:green;font-weight:bold;font-size:10pt;' colspan='3'>(.*?)</TD></TR>\s+(<TR><TD style='font-family:Verdana;color:black;font-size:10pt;' colspan='3'><P style='margin-bottom:5pt;'>(.*?)</P></TD></TR>\s+)+</TABLE>")
-note_row_regex = re.compile("<TR><TD style='font-family:Verdana;color:black;font-size:10pt;' colspan='3'><P style='margin-bottom:5pt;'>(.*?)</P></TD></TR>")
+warning_regex = re.compile("<TABLE bgcolor='white' border='0' style='border-bottom: red 1px solid; border-top: red 1px solid;border-right: red 1px solid;border-left: red 1px solid;' cellspacing='1' rules='none' width='60%'><TR><TD>\s+<TABLE bgcolor='white' border='0' style='border-bottom: red 3px solid; border-top: red 3px solid;border-right: red 3px solid;border-left: red 3px solid;' cellspacing='1' rules='none' width='100%'><TR><TD>\s+<TABLE bgcolor='ffdddd' border='0' style='border-bottom: red 1px solid; border-top: red 1px solid;border-right: red 1px solid;border-left: red 1px solid;' cellspacing='0' rules='none' width='100%'><TR align='center'><TD height='60' style='color:red;font-weight:bold;font-size:10pt;font-family:Verdana;'><IMG Src='attention.gif'>&nbsp;(.*?)</TD></TR><TR><TD><TABLE width='97%' style='margin-left:5pt;'>\s*<TR><TD style='font-family:Verdana;color:black;font-size:10pt;' colspan='3'><P style='margin-bottom:5pt;'>(.*?)</P></TD></TR>\s*</TABLE></TD></TR><TR><TD height='10'></TD></TR></TABLE>\s+</TD>\s+</TR>\s+</TABLE>\s+</TD>\s+</TR>\s+</TABLE>", re.DOTALL)
+observe_regex = re.compile("<TABLE frame='hsides' bordercolor='#000000' cellspacing='0' cellpadding='5' rules='none' width='60%' bgcolor='f8f8f8'><TR><TD colspan='3' height='30' style='color:blue;font-weight:bold;font-size:10pt;font-family:Verdana;'>(.*?)</TD></TR>\s+<TR><TD colspan='3' style='font-family:Verdana;color:black;font-size:10pt;'><P style='margin-bottom:5pt;'>(.*?)</P></TD></TR>\s+<TR><TD height='10' colspan='3'></TD></TR></TABLE>", re.DOTALL)
+note_regex = re.compile("<TABLE frame='void' rules='none' width='60%' bgcolor='f8f8f8'><TR><TD style='color:green;font-weight:bold;font-size:10pt;' colspan='3'>(.*?)</TD></TR>\s+(<TR><TD style='font-family:Verdana;color:black;font-size:10pt;' colspan='3'><P style='margin-bottom:5pt;'>(.*?)</P></TD></TR>\s+)+</TABLE>", re.DOTALL)
+note_row_regex = re.compile("<TR><TD style='font-family:Verdana;color:black;font-size:10pt;' colspan='3'><P style='margin-bottom:5pt;'>(.*?)</P></TD></TR>", re.DOTALL)
 
 h1_regex = re.compile("<TABLE width='100%' border='0' bgcolor='#6699cc' cellspacing='0' cellpadding='0' style='margin-left:0pt;'><TR><TD style='border-bottom: black 0px solid; border-top: #99ccff 0px solid;border-right: #99ccff 0px solid;border-left: #99ccff 0px solid;font-size:12pt;color:white;font-weight:bold;padding-bottom:1px;padding-top:1px;' align='left' width='27' height='25'>&nbsp;</TD><TD style='border-bottom: black 0px solid; border-top: #99ccff 0px solid;border-right: #99ccff 0px solid;border-left: #99ccff 0px solid;font-size:10pt;color:white;font-weight:bold;padding-bottom:1px;padding-top:1px;' align='left'>(.*?)</TD></TR></TABLE>")
 reference_regex = re.compile("<A NAME=\"(\d+)\"></a><a name='s(\d+)'></a>")
@@ -69,8 +73,8 @@ ul_dot_li_regex = re.compile("<SPAN style='position:relative'><TABLE border='0' 
 ul_regex = re.compile("(<SPAN style='position:relative'><TABLE border='0' width='90%'><TR><TD width='20' valign='top' style='font-family:Verdana;color:black;font-size:10pt;'>-</TD><TD colspan='2' style='font-family:Verdana;color:black;font-size:10pt;'>.*?</TD></TR></TABLE></SPAN>\s+)+", re.DOTALL)
 ul_li_regex = re.compile("<SPAN style='position:relative'><TABLE border='0' width='90%'><TR><TD width='20' valign='top' style='font-family:Verdana;color:black;font-size:10pt;'>-</TD><TD colspan='2' style='font-family:Verdana;color:black;font-size:10pt;'>(.*?)</TD></TR></TABLE></SPAN>", re.DOTALL)
 
-ol_regex = re.compile("(<SPAN style='position:relative'><TABLE border='0' width='90%'><TR><TD width='20' valign='top' style='font-family:Verdana;color:black;font-size:8pt;'>\d+\.</TD><TD colspan='2' style='font-family:Verdana;color:black;font-size:8pt;'>.*?</TD></TR></TABLE></SPAN>\s+)+", re.DOTALL)
-ol_li_regex = re.compile("<SPAN style='position:relative'><TABLE border='0' width='90%'><TR><TD width='20' valign='top' style='font-family:Verdana;color:black;font-size:8pt;'>(\d+)\.</TD><TD colspan='2' style='font-family:Verdana;color:black;font-size:8pt;'>(.*?)</TD></TR></TABLE></SPAN>", re.DOTALL)
+ol_regex = re.compile("(<SPAN style='position:relative'><TABLE border='0' width='90%'><TR><TD width='20' valign='top' style='font-family:Verdana;color:black;font-size:10pt;'>\d+\.</TD><TD colspan='2' style='font-family:Verdana;color:black;font-size:10pt;'>.*?</TD></TR></TABLE></SPAN>\s+)+", re.DOTALL)
+ol_li_regex = re.compile("<SPAN style='position:relative'><TABLE border='0' width='90%'><TR><TD width='20' valign='top' style='font-family:Verdana;color:black;font-size:10pt;'>(\d+)\.</TD><TD colspan='2' style='font-family:Verdana;color:black;font-size:10pt;'>(.*?)</TD></TR></TABLE></SPAN>", re.DOTALL)
 
 img_extensions = {}
 for f in os.listdir(IMG_DIRECTORY):
@@ -78,7 +82,11 @@ for f in os.listdir(IMG_DIRECTORY):
         filename, extension = f.rsplit('.', 1)
         img_extensions[filename] = extension
 
-doc_files = [f for f in glob(os.path.join(DIRECTORY, "doc[0-9]*.htm"))]
+#doc_list = [48161]
+
+#doc_files = [f for f in glob(os.path.join(DIRECTORY, "doc[0-9]*.htm"))]
+doc_files = [os.path.join(DIRECTORY, 'doc{}.htm'.format(doc_id))
+             for doc_id in doc_list]
 
 img_count = 0
 img_fail_count = 0
@@ -87,7 +95,7 @@ doc_count = 0
 
 dt_start = datetime.datetime.now()
 
-doc_files = ['static/data/se/doc43727.htm']
+#doc_files = ['static/data/se/doc43727.htm']
 
 # TODO view-source:http://127.0.0.1:5000/static/data/se/doc26075.html
 # html tag ends before text
@@ -140,7 +148,7 @@ for file_path in sorted(doc_files):
         if not ul:
             break
 
-        print('ul wop')
+        #print('ul wop')
         ul_html = '<ul>'
         for li in re.finditer(ul_dot_li_regex, ul.group(0)):
             ul_html += '<li>{}</li>'.format(li.group(1))
@@ -153,9 +161,9 @@ for file_path in sorted(doc_files):
         if not ul:
             break
 
-        print('ul wop')
+        #print('ul wop')
         ul_html = '<ul>'
-        for li in re.finditer(ul_li_regex, ul.group(0), re.DOTALL):
+        for li in re.finditer(ul_li_regex, ul.group(0)):
             ul_html += '<li>{}</li>'.format(li.group(1))
         ul_html += '</ul>'
 
@@ -213,28 +221,38 @@ for file_path in sorted(doc_files):
         if not div.attrs or div.attrs == {'style': 'margin-left:20pt;margin-right:5pt;'}:
             div.replaceWithChildren()
 
-
     for link in soup.find_all('a'):
         if not link.contents:
             pass
             #print('No contents in a tag. Removing')
             #link.extract()
-        elif link['href'].startswith('wisref://'):
+        elif link['href'].startswith('wisref://l'):
+            # Page reference
+
             link_ref_id = link['href'][10:]
+            if doc_id not in links:
+                print('Error: Unable to find reference {} for doc{}'.format(link_ref_id, doc_id))
+                continue
+
             link_real_ref = links[doc_id][link_ref_id]
 
             link['href'] = 'javascript:void(0)'
 
+            if doc_count == 662:
+                pass
             # Is this a reference to a doc
             if link_real_ref in link_ref:
                 link['onclick'] = 'open_doc({})'.format(link_ref[link_real_ref])
             # Is this a reference to part of a doc
             elif link_real_ref in link_subref:
-                link['onclick'] = 'open_sub_doc({}, {})'.format(link_real_ref[link_real_ref][0], link_real_ref[link_real_ref][1])
+                link['onclick'] = 'open_sub_doc({}, {})'.format(link_subref[link_real_ref][0], link_subref[link_real_ref][1])
             else:
                 print('Error: Unable to follow reference id={}'.format(link_real_ref))
                 sys.exit()
+        elif link['href'].startswith('wisref://c'):
+            # Menu reference
 
+            link_ref_id = link['href'][10:]
 
         elif link['href'].startswith('wisimg://'):
             img_count += 1
@@ -262,7 +280,8 @@ for file_path in sorted(doc_files):
             #figure_tag.append(figcaption_tag)
 
             link.replace_with(figure_tag)
-
+        else:
+            print('Warning: Unknown reference ({})'.format(link['href']))
     # Insert doctype
     img_tag = soup.new_tag("!DOCTYPE")
     doctype_tag = Doctype('html')
