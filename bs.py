@@ -6,23 +6,28 @@ bs for beautiful soup the library being used, alternatively bs could mean
 bullshit for the internet explorer shit code that was used to make the Saab WIS
 """
 
+import logging
 import sys
 import os
 import htmlmin
 import datetime
 import re
 import json
+import copy
 
 from bs4 import BeautifulSoup
+import bs4
 from bs4 import Doctype
 from glob import glob
 
-DIRECTORY = 'static/data/se'
-IMG_DIRECTORY = 'static/data/images'
+from itertools import islice
 
+LANGUAGE = 'se'
+DIRECTORY = os.path.join('static', 'data', LANGUAGE)
+IMG_DIRECTORY = os.path.join('static', 'data', 'images')
 
 replacements = {
-    # We don't need BR (I think)
+    # We probably don't need the br tags
     '<BR>': '',
     '<br>': '',
 
@@ -52,32 +57,11 @@ try:
 except (IOError, OSError) as e:
     pass
 
-if not links or not link_ref or not link_subref:
+if not doc_list or not links or not link_ref or not link_subref:
     print('Error: Please run gen.py first')
     sys.exit()
 
-# Regular expression so we can reformat to proper HTML
-warning_regex = re.compile("<TABLE bgcolor='white' border='0' style='border-bottom: red 1px solid; border-top: red 1px solid;border-right: red 1px solid;border-left: red 1px solid;' cellspacing='1' rules='none' width='60%'><TR><TD>\s+<TABLE bgcolor='white' border='0' style='border-bottom: red 3px solid; border-top: red 3px solid;border-right: red 3px solid;border-left: red 3px solid;' cellspacing='1' rules='none' width='100%'><TR><TD>\s+<TABLE bgcolor='ffdddd' border='0' style='border-bottom: red 1px solid; border-top: red 1px solid;border-right: red 1px solid;border-left: red 1px solid;' cellspacing='0' rules='none' width='100%'><TR align='center'><TD height='60' style='color:red;font-weight:bold;font-size:10pt;font-family:Verdana;'><IMG Src='attention.gif'>&nbsp;(.*?)</TD></TR><TR><TD><TABLE width='97%' style='margin-left:5pt;'>\s*<TR><TD style='font-family:Verdana;color:black;font-size:10pt;' colspan='3'><P style='margin-bottom:5pt;'>(.*?)</P></TD></TR>\s*</TABLE></TD></TR><TR><TD height='10'></TD></TR></TABLE>\s+</TD>\s+</TR>\s+</TABLE>\s+</TD>\s+</TR>\s+</TABLE>", re.DOTALL)
-
-observe_regex = re.compile("<TABLE frame='hsides' bordercolor='#000000' cellspacing='0' cellpadding='5' rules='none' width='60%' bgcolor='f8f8f8'><TR><TD colspan='3' height='30' style='color:blue;font-weight:bold;font-size:10pt;font-family:Verdana;'>(.*?)</TD></TR>\s*(<TR><TD colspan='3' style='font-family:Verdana;color:black;font-size:10pt;'><P style='margin-bottom:5pt;'>(.*?)</P></TD></TR>\s*)+<TR><TD height='10' colspan='3'></TD></TR></TABLE>", re.DOTALL)
-observe_row_regex = re.compile("<TR><TD colspan='3' style='font-family:Verdana;color:black;font-size:10pt;'><P style='margin-bottom:5pt;'>(.*?)</P></TD></TR>", re.DOTALL)
-
-note_regex = re.compile("<TABLE frame='void' rules='none' width='60%' bgcolor='f8f8f8'><TR><TD style='color:green;font-weight:bold;font-size:10pt;' colspan='3'>(.*?)</TD></TR>\s+(<TR><TD style='font-family:Verdana;color:black;font-size:10pt;' colspan='3'><P style='margin-bottom:5pt;'>(.*?)</P></TD></TR>\s+)+</TABLE>", re.DOTALL)
-note_row_regex = re.compile("<TR><TD style='font-family:Verdana;color:black;font-size:10pt;' colspan='3'><P style='margin-bottom:5pt;'>(.*?)</P></TD></TR>", re.DOTALL)
-
-h1_regex = re.compile("<TABLE width='100%' border='0' bgcolor='#6699cc' cellspacing='0' cellpadding='0' style='margin-left:0pt;'><TR><TD style='border-bottom: black 0px solid; border-top: #99ccff 0px solid;border-right: #99ccff 0px solid;border-left: #99ccff 0px solid;font-size:12pt;color:white;font-weight:bold;padding-bottom:1px;padding-top:1px;' align='left' width='27' height='25'>&nbsp;</TD><TD style='border-bottom: black 0px solid; border-top: #99ccff 0px solid;border-right: #99ccff 0px solid;border-left: #99ccff 0px solid;font-size:10pt;color:white;font-weight:bold;padding-bottom:1px;padding-top:1px;' align='left'>(.*?)</TD></TR></TABLE>", re.DOTALL)
-reference_regex = re.compile("<A NAME=\"(\d+)\"></a><a name='s(\d+)'></a>")
-h2_regex = re.compile("<TABLE width='92%' border='0' bgcolor='#6699cc' cellspacing='0' cellpadding='0' style='margin-left:-3pt;'><TR><TD style='border-bottom: black 0px solid; border-top: #99ccff 0px solid;border-right: #99ccff 0px solid;border-left: #99ccff 0px solid;font-size:10pt;color:white;font-weight:bold;padding-bottom:1px;padding-top:1px;' align='left'>&nbsp;(.*?)</TD></TR></TABLE>", re.DOTALL)
-h3_regex = re.compile("<H2 style='font-size:10pt;margin-top:12pt;'>(.*?)</H2>", re.DOTALL)
-
-ul_dot_regex = re.compile("(<SPAN style='position:relative'><TABLE border='0' width='90%'><TR><TD width='20' valign='top' style='font-family:Verdana;color:black;font-size:10pt;'>&bull;</TD><TD colspan='2' style='font-family:Verdana;color:black;font-size:10pt;'>.*?</TD></TR></TABLE></SPAN>\s+)+", re.DOTALL)
-ul_dot_li_regex = re.compile("<SPAN style='position:relative'><TABLE border='0' width='90%'><TR><TD width='20' valign='top' style='font-family:Verdana;color:black;font-size:10pt;'>&bull;</TD><TD colspan='2' style='font-family:Verdana;color:black;font-size:10pt;'>(.*?)</TD></TR></TABLE></SPAN>", re.DOTALL)
-
-ul_regex = re.compile("(<SPAN style='position:relative'><TABLE border='0' width='90%'><TR><TD width='20' valign='top' style='font-family:Verdana;color:black;font-size:10pt;'>-</TD><TD colspan='2' style='font-family:Verdana;color:black;font-size:10pt;'>.*?</TD></TR></TABLE></SPAN>\s+)+", re.DOTALL)
-ul_li_regex = re.compile("<SPAN style='position:relative'><TABLE border='0' width='90%'><TR><TD width='20' valign='top' style='font-family:Verdana;color:black;font-size:10pt;'>-</TD><TD colspan='2' style='font-family:Verdana;color:black;font-size:10pt;'>(.*?)</TD></TR></TABLE></SPAN>", re.DOTALL)
-
-ol_regex = re.compile("(<SPAN style='position:relative'><TABLE border='0' width='90%'><TR><TD width='20' valign='top' style='font-family:Verdana;color:black;font-size:10pt;'>\d+\.</TD><TD colspan='2' style='font-family:Verdana;color:black;font-size:10pt;'>.*?</TD></TR></TABLE></SPAN>\s+)+", re.DOTALL)
-ol_li_regex = re.compile("<SPAN style='position:relative'><TABLE border='0' width='90%'><TR><TD width='20' valign='top' style='font-family:Verdana;color:black;font-size:10pt;'>(\d+)\.</TD><TD colspan='2' style='font-family:Verdana;color:black;font-size:10pt;'>(.*?)</TD></TR></TABLE></SPAN>", re.DOTALL)
+ordered_list_regex = re.compile("\d+\.")
 
 img_extensions = {}
 for f in os.listdir(IMG_DIRECTORY):
@@ -88,8 +72,7 @@ for f in os.listdir(IMG_DIRECTORY):
 doc_list = [16610]
 
 #doc_files = [f for f in glob(os.path.join(DIRECTORY, "doc[0-9]*.htm"))]
-doc_files = [os.path.join(DIRECTORY, 'doc{}.htm'.format(doc_id))
-             for doc_id in doc_list]
+doc_files = [os.path.join(DIRECTORY, 'doc{}.htm'.format(doc_id)) for doc_id in doc_list]
 
 img_count = 0
 img_fail_count = 0
@@ -100,8 +83,244 @@ dt_start = datetime.datetime.now()
 
 #doc_files = ['static/data/se/doc43727.htm']
 
-# TODO view-source:http://127.0.0.1:5000/static/data/se/doc26075.html
-# html tag ends before text
+
+def is_int(s):
+    try:
+        int(s)
+        return True
+    except ValueError:
+        return False
+
+
+def consume(iterator, n):
+    """ Advance the iterator n steps
+    """
+    next(islice(iterator, n, n), None)
+
+
+def unwrap_and_advance(tag: bs4.Tag, iterator: iter):
+    """ Unwrap a tag and advance the iterator to prevent processing of elements inside the tag
+    """
+    content_count = len(tag.contents)
+    tag.unwrap()
+    consume(iterator, content_count - 1)
+
+logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
+
+# Meh
+doc_title = None
+
+
+def convert_document(soup, element):
+    global doc_title
+
+    current_list = None
+
+    iterator = element.children
+    for child in iterator:
+        if isinstance(child, bs4.NavigableString):
+            pass
+        elif isinstance(child, bs4.Tag):
+            logging.debug('Processing tag {}'.format(child.name))
+
+            if child.name == 'table':
+                if child.attrs == {'cellpadding': '0', 'bgcolor': '#6699cc', 'cellspacing': '0', 'border': '0',
+                                   'style': 'margin-left:0pt;', 'width': '100%'}:
+                    logging.debug('Element type: Heading')
+
+                    if doc_title:
+                        print('Error: Multiple titles for the same document')
+                        sys.exit()
+
+                    doc_title = child.tbody.tr.find_all('td', recursive=False)[1].string
+
+                    child.name = 'h1'
+                    child.attrs = {}
+                    child.string = doc_title
+                elif child.attrs == {'border': '0', 'width': '92%', 'style': 'margin-left:-3pt;',
+                                     'cellpadding': '0', 'bgcolor': '#6699cc', 'cellspacing': '0'}:
+                    logging.debug('Sub heading')
+
+                    sub_heading = child.tbody.tr.td.string
+
+                    child.name = 'h2'
+                    child.attrs = {}
+                    child.string = sub_heading
+                elif child.attrs == {'rules': 'none', 'width': '60%', 'cellspacing': '1',
+                                     'style': 'border-bottom: red 1px solid; border-top: red 1px solid;border-right: red 1px solid;border-left: red 1px solid;',
+                                     'border': '0', 'bgcolor': 'white'}:
+                    logging.debug('Warning tag')
+
+                    warning_table = child.table.tbody.tr.td
+
+                    convert_document(soup, warning_table)
+                    print(child.table.tbody.tr.td)
+
+                    p_tags = warning_table.find_all('p', recursive=False)
+                    print('ptags: ',p_tags)
+
+                    p_tags[1].unwrap()
+                    p_tags[0].name = 'h4'
+                    p_tags[0]['class'] = ['alert-heading']
+
+                    warning_table.name = 'div'
+                    warning_table['class'] = ['alert', 'alert-danger']
+
+                    warning_table.extract()
+                    child.replace_with(warning_table)
+                elif child.attrs == {'width': '60%', 'bordercolor': '#000000', 'bgcolor': 'f8f8f8', 'rules': 'none',
+                                     'cellpadding': '5', 'frame': 'hsides', 'cellspacing': '0'}:
+                    logging.debug('Observe tag')
+
+                    child.attrs = {}
+                    observe_tag = soup.new_tag('div')
+                    observe_tag['class'] = ['alert', 'alert-warning']
+                    child.wrap(observe_tag)
+
+                    convert_document(soup, observe_tag)
+
+                    observe_tag.contents[0].name = 'h4'
+                    observe_tag.contents[0]['class'] = ['alert-heading']
+                else:
+                    logging.debug('Assuming general table')
+
+                    for row in child.tbody.find_all('tr', recursive=False):
+                        columns = row.find_all('td', recursive=False)
+                        if len(columns) == 1:
+                            columns[0].name = 'p'
+                            columns[0].attrs = {}
+
+                            convert_document(soup, columns[0])
+
+                            row.unwrap()
+                            #unwrap_and_advance(row, iterator)
+                        elif len(columns) == 2:
+                            left_col, right_col = columns
+
+                            convert_document(soup, right_col)
+
+                            if ordered_list_regex.match(left_col.string):
+                                list_item_index = int(left_col.string[:-1])
+
+                                list_item = soup.new_tag('li')
+                                for c in right_col.contents:
+                                    list_item.append(copy.copy(c))
+
+                                print(list_item_index)
+                                if list_item_index == 1:
+                                    current_list = soup.new_tag('ol')
+                                    row.replace_with(current_list)
+                                elif current_list.name != 'ol':
+                                    logging.error('List mismatch')
+                                    sys.exit()
+                                elif not current_list or len(current_list.contents) + 1 != list_item_index:
+                                    logging.error('List index error')
+                                    sys.exit()
+                                else:
+                                    row.replace_with('\n')
+
+                                current_list.append(list_item)
+                            elif left_col.string == '•':
+
+                                list_item = soup.new_tag('li')
+                                for list_content in right_col.children:
+                                    list_item.append(copy.copy(list_content))
+
+                                if current_list and current_list.name == 'ul':
+                                    row.replace_with('\n')
+                                else:
+                                    current_list = soup.new_tag('ul')
+                                    row.replace_with(current_list)
+
+                                current_list.append(list_item)
+                            else:
+                                print('List with "{}", not implemented'.format(left_col.string))
+                                sys.exit()
+
+                        else:
+                            logging.error('Parsing table with more than 3 columns is not implemented yet')
+                            sys.exit()
+
+                    if not child.contents:
+                        child.replace_with('\n')
+                    else:
+                        child.tbody.unwrap()
+                        unwrap_and_advance(child, iterator)
+            elif child.name == 'div' or child.name == 'span' or child.name == 'p':
+                child.insert(0, '\n')
+                child.unwrap()
+            elif child.name == 'img':
+                if child['src'] == 'link.gif':
+                    glyph_icon = soup.new_tag('span')
+                    glyph_icon['class'] = ['glyphicon', 'glyphicon-link']
+                    child.replace_with(glyph_icon)
+                elif child['src'] == 'attention.gif':
+                    glyph_icon = soup.new_tag('span')
+                    glyph_icon['class'] = ['glyphicon', 'glyphicon-warning-sign']
+                    child.replace_with(glyph_icon)
+                else:
+                    logging.error('Unknown image {}'.format(img['src']))
+                    sys.exit()
+
+            elif child.name == 'a':
+                if not child.contents and 'name' in child.attrs:
+                    if is_int(child['name']):
+                        child.replace_with('\n')
+                    else:
+                        child.name = 'span'
+                        child.attrs = {'id': child['name']}
+                elif 'href' in child.attrs:
+                    if child['href'].startswith('wisimg://i'):
+                        # Image reference
+
+                        img_id = child['href'][10:]
+                        extension = img_extensions.get(img_id, None)
+
+                        if not extension:
+                            print('Error: Unable to find image {}'.format(img_id))
+
+                        figure_tag = soup.new_tag('figure')
+
+                        img_tag = soup.new_tag('img')
+                        img_tag['src'] = '/static/data/images/{}.{}'.format(img_id, extension)
+                        img_tag['width'] = '300'
+                        img_tag['alt'] = img_id
+
+                        figure_tag.append(img_tag)
+
+                        # figcaption_tag = soup.new_tag('figcaption')
+                        # figcaption_tag.append('caption goes here')
+                        # figure_tag.append(figcaption_tag)
+
+                        child.replace_with(figure_tag)
+                    elif child['href'].startswith('wisref://c'):
+                        # Menu reference
+
+                        link_ref_id = link['href'][10:]
+
+                        child['href'] = 'javascript:void(0)'
+                        child['onclick'] = 'open_menu({})'.format(link_ref_id)
+                    elif child['href'].startswith('wisref://l'):
+                        # Page reference
+
+                        link_ref_id = link['href'][10:]
+
+                        child['href'] = 'javascript:void(0)'
+                        child['onclick'] = 'open_doc({})'.format(link_ref_id)
+                    else:
+                        logging.error('Unknown reference ({})'.format(link['href']))
+                        sys.exit()
+                else:
+                    logging.error('Unknown a-tag')
+                    sys.exit()
+            else:
+                print('Error: Unknown tag {}'.format(child.name))
+                print(child)
+                sys.exit()
+
+        else:
+            print('Error: Unexpected bs4 element ({})'.format(type(child)))
+
 
 for file_path in sorted(doc_files):
     doc_count += 1
@@ -117,114 +336,19 @@ for file_path in sorted(doc_files):
     for old, new in replacements.items():
         source = source.replace(old, new)
 
-    source = warning_regex.sub('<div class="alert alert-danger"><h4 class="alert-heading">\g<1></h4><p>\g<2></p></div>', source)
-    #source = observe_regex.sub('<div class="alert alert-info"><h4 class="alert-heading">\g<1></h4><p>\g<2></p></div>', source)
-
-    while True:
-        observe = observe_regex.search(source)
-        if not observe:
-            break
-        print('observe')
-        observe_html = '<div class="alert alert-info"><h4 class="alert-heading">{}</h4>'.format(observe.group(1))
-        for observe_row in re.finditer(observe_row_regex, observe.group(0)):
-            print('wop')
-            observe_html += '<p>{}</p>'.format(observe_row.group(1))
-
-        observe_html += '</div>'
-
-        source = source[:observe.start()] + observe_html + source[observe.end():]
-
-    while True:
-        note = note_regex.search(source)
-        if not note:
-            break
-
-        note_html = '<div class="alert alert-success"><h4 class="alert-heading">{}</h4>'.format(note.group(1))
-        for note_row in re.finditer(note_row_regex, note.group(0)):
-            note_html += '<p>{}</p>'.format(note_row.group(1))
-
-        note_html += '</div>'
-
-        source = source[:note.start()] + note_html + source[note.end():]
-
-    # Extract value for page title
-    for heading in re.finditer(h1_regex, source):
-        if doc_title:
-            print("Warning: Found multiple headings")
-        else:
-            doc_title = heading.group(1)
-
-    source = h1_regex.sub('<h1>\g<1></h1>', source)
-    # Reference (always (?) before sub heading)
-    source = reference_regex.sub('<span id="s\g<1>"></span>', source)
-    source = h2_regex.sub('<h2>\g<1></h2>', source)
-    source = h3_regex.sub('<h3>\g<1></h3>', source)
-
-    while True:
-        ul = re.search(ul_dot_regex, source)
-        if not ul:
-            break
-
-        #print('ul wop')
-        ul_html = '<ul>'
-        for li in re.finditer(ul_dot_li_regex, ul.group(0)):
-            ul_html += '<li>{}</li>'.format(li.group(1))
-        ul_html += '</ul>'
-
-        source = source[:ul.start()] + ul_html + source[ul.end():]
-
-    while True:
-        ul = re.search(ul_regex, source)
-        if not ul:
-            break
-
-        #print('ul wop')
-        ul_html = '<ul>'
-        for li in re.finditer(ul_li_regex, ul.group(0)):
-            ul_html += '<li>{}</li>'.format(li.group(1))
-        ul_html += '</ul>'
-
-        source = source[:ul.start()] + ul_html + source[ul.end():]
-
-    while True:
-        ol = re.search(ol_regex, source)
-        if not ol:
-            break
-
-        ol_li_count = 1
-        ol_html = '<ol>'
-        for li in re.finditer(ol_li_regex, ol.group(0)):
-            if ol_li_count != int(li.group(1)):
-                if int(li.group(1)) == 1:
-                    ol_html += '</ol><ol>'
-                else:
-                    print('Error: Unable to parse ordered list')
-                    print(ol_li_count, li.group(1))
-
-                    break
-
-            #if ol_li_count == 12:
-            #    print(li.group(2))
-            #    sys.exit()
-
-            ol_html += '<li>{}</li>'.format(li.group(2))
-
-            ol_li_count += 1
-        ol_html += '</ol>'
-
-        source = source[:ol.start()] + ol_html + source[ol.end():]
-
     soup = BeautifulSoup(source, 'html5lib')
 
     # Error if we find any script
     if soup.find('script'):
-        print('Error: Unable to remove all script tags from {}'
-              .format(file_path))
+        print('Error: Unable to remove all script tags from {}'.format(file_path))
         sys.exit()
 
+    convert_document(soup, soup.body)
+
     for p in soup.find_all('p'):
-        if p.attrs == {'style': 'margin-top:3pt;margin-bottom;10pt;'}:
-            del p['style']
+        if p.attrs == {'style': 'margin-top:3pt;margin-bottom;10pt;'} or p.attrs == {'style': 'margin-bottom:5pt;'}:
+            #del p['style']
+            p.replace_with_children()
 
     for img in soup.find_all('img'):
         if img['src'] == 'link.gif':
@@ -311,7 +435,6 @@ for file_path in sorted(doc_files):
     soup.insert(0, doctype_tag)
 
     # Insert shit into html tag
-    #soup.find('html')['xmlns'] = 'http://www.w3.org/1999/xhtml'
     title_tag = soup.new_tag('title')
     if doc_title:
         title_tag.append(doc_title)
@@ -320,10 +443,10 @@ for file_path in sorted(doc_files):
     del soup.find('body')['style']
 
     # Generate HTML source code
-    html_source = str(soup)
+    html_source = soup.prettify()
     # html_source = html_source.replace('</br>', '').replace('<br>', '<br/>')
 
-    #html_source = htmlmin.minify(html_source, remove_comments=True)
+    # html_source = htmlmin.minify(html_source, remove_comments=True)
 
     with open('{}l'.format(file_path), 'w', encoding='utf-8') as f:
         f.write(html_source)
