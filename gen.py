@@ -84,6 +84,10 @@ link_ref = {}
 link_subref = {}
 links = {}
 
+
+docs_new = {}  # {id: {'menu': ?, 'tab': ?, 'doc': ?}, ...}
+
+
 for sct in soup.findAll('sct'):
     tree_data.append({
         'text': sct.find('name').contents[0],
@@ -109,6 +113,11 @@ for sct in soup.findAll('sct'):
             for sie in sit.findAll('sie'):
                 doc_list.append(sie['docid'])
 
+                docs_new[sie['id']] = {
+                    'menu': sc_id,
+                    'tab': sit['num'],
+                    'doc': sie['docid'],
+                }
                 link_ref[sie['id']] = sie['docid']
 
                 children = []
@@ -120,7 +129,7 @@ for sct in soup.findAll('sct'):
                 for sisub in sie.find_all('sisub'):
                     link_subref[sisub['id']] = (sie['docid'], sisub['sisubid'])
 
-                    sisub_name_contents = sisub.find('name').contents  # name tag might be empty for unkown reason
+                    sisub_name_contents = sisub.find('name').contents  # name tag might be empty for unknown reason
                     sisub_name = sisub_name_contents[0] if sisub_name_contents else 'null'
 
                     children.append({
@@ -136,6 +145,9 @@ for sct in soup.findAll('sct'):
                     submenu['nodes'] = children
 
                 submenus[sc_id][sit['num']].append(submenu)
+
+with open(os.path.join(OUTPUT_DIRECTORY, 'doc.json'), 'w') as outfile:
+    json.dump(docs_new, outfile)
 
 with open(os.path.join(OUTPUT_DIRECTORY, 'menu.json'), 'w') as outfile:
     json.dump(tree_data, outfile)

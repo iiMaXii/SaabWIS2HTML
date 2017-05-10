@@ -13,14 +13,9 @@ import htmlmin
 import datetime
 import re
 import json
-import copy
 
 from bs4 import BeautifulSoup
 import bs4
-from bs4 import Doctype
-from glob import glob
-
-from itertools import islice
 
 LANGUAGE = 'se'
 DIRECTORY = os.path.join('static', 'data', LANGUAGE)
@@ -62,6 +57,9 @@ if not doc_list or not links or not link_ref or not link_subref:
     sys.exit()
 
 ordered_list_regex = re.compile("\d+\.")
+ordered_list_alpha_regex = re.compile("[a-z]\.")
+ordered_list_number_alpha_regex = re.compile("\d+\.[A-Za-z]\.")
+ordered_list_number_number_regex = re.compile("\d+\.\d+\.")
 
 img_extensions = {}
 for f in os.listdir(IMG_DIRECTORY):
@@ -69,9 +67,12 @@ for f in os.listdir(IMG_DIRECTORY):
         filename, extension = f.rsplit('.', 1)
         img_extensions[filename] = extension
 
-doc_list = [16610]
+#16088#abc
+#doc16615
 
-#doc_files = [f for f in glob(os.path.join(DIRECTORY, "doc[0-9]*.htm"))]
+doc_list = doc_list[doc_list.index('42844'):]
+#doc_list = [42844]
+
 doc_files = [os.path.join(DIRECTORY, 'doc{}.htm'.format(doc_id)) for doc_id in doc_list]
 
 img_count = 0
@@ -81,8 +82,6 @@ doc_count = 0
 
 dt_start = datetime.datetime.now()
 
-#doc_files = ['static/data/se/doc43727.htm']
-
 
 def is_int(s):
     try:
@@ -91,197 +90,512 @@ def is_int(s):
     except ValueError:
         return False
 
-
-def consume(iterator, n):
-    """ Advance the iterator n steps
-    """
-    next(islice(iterator, n, n), None)
-
-
-def unwrap_and_advance(tag: bs4.Tag, iterator: iter):
-    """ Unwrap a tag and advance the iterator to prevent processing of elements inside the tag
-    """
-    content_count = len(tag.contents)
-    tag.unwrap()
-    consume(iterator, content_count - 1)
-
 logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
 
 # Meh
 doc_title = None
 
 
-def convert_document(soup, element):
-    global doc_title
+class StackElement:
+    def __init__(self, level: int, element: bs4.Tag):
+        self.level = level
+        self.element = element
 
-    current_list = None
 
-    iterator = element.children
-    for child in iterator:
-        if isinstance(child, bs4.NavigableString):
-            pass
-        elif isinstance(child, bs4.Tag):
-            logging.debug('Processing tag {}'.format(child.name))
+element_stack = []  # Lists and tables
+level_count = 0
 
-            if child.name == 'table':
-                if child.attrs == {'cellpadding': '0', 'bgcolor': '#6699cc', 'cellspacing': '0', 'border': '0',
-                                   'style': 'margin-left:0pt;', 'width': '100%'}:
-                    logging.debug('Element type: Heading')
+
+def convert_document2(input, output: bs4.Tag, output_soup: bs4.BeautifulSoup) -> None:
+    global doc_title, element_stack, level_count
+
+    level_count += 1
+    logging.debug('level_count={}'.format(level_count))
+
+    logging.debug('Looping {}'.format(input.name))
+    for input_child in input.contents:
+        logging.debug('Processing {} ({})'.format(input_child.name, input_child))
+        if isinstance(input_child, bs4.NavigableString):
+            logging.debug('Appending string "{}"'.format(str(input_child)))
+            output.append(str(input_child))
+        elif isinstance(input_child, bs4.Comment):
+            logging.debug('Skipping comment')
+        elif isinstance(input_child, bs4.Tag):
+            logging.debug(input_child.attrs)
+            if input_child.name == 'div' or input_child.name == 'span' or input_child.name == 'p':
+                convert_document2(input_child, output, output_soup)
+            elif (input_child.name == 'i' or input_child.name == 'b' or input_child.name == 'sup'
+                  or input_child.name == 'sub' or input_child.name == 'u'):
+                # TODO maybe replace <u> with <span style="text-decoration:underline;">
+                tag = output_soup.new_tag(input_child.name)
+                output.append(tag)
+                convert_document2(input_child, tag, output_soup)
+            elif input_child.name == 'h2':
+                h3_tag = output_soup.new_tag('h3')
+                convert_document2(input_child, h3_tag, output_soup)
+                output.append(h3_tag)
+            elif input_child.name == 'meta':
+                if input_child.attrs == {'http-equiv': 'Content-Type', 'content': 'text/html; charset=windows-1252'}:
+                    pass  # Ignore
+                else:
+                    logging.error('Unknown meta tag attributes')
+                    sys.exit()
+            elif input_child.name == 'input':
+                if input_child.attrs == {'type': 'checkbox'}:
+                    checkbox = output_soup.new_tag('input')
+                    checkbox.attrs = {'type': 'checkbox'}
+                else:
+                    logging.error('Unexpected input tag')
+                    sys.exit()
+            elif input_child.name == 'table':
+                if input_child.attrs == {'cellpadding': '0', 'bgcolor': '#6699cc', 'cellspacing': '0', 'border': '0',
+                                         'style': 'margin-left:0pt;', 'width': '100%'}:
+                    logging.debug('Processing heading table')
 
                     if doc_title:
-                        print('Error: Multiple titles for the same document')
+                        logging.error('Error: Multiple titles for the same document')
                         sys.exit()
 
-                    doc_title = child.tbody.tr.find_all('td', recursive=False)[1].string
+                    if (len(input_child.tbody.find_all('tr', recursive=False)) != 1 or
+                            len(input_child.tbody.tr.find_all('td', recursive=False)) != 2):
+                        logging.error('Unexpected tr/td count')
+                        sys.exit()
 
-                    child.name = 'h1'
-                    child.attrs = {}
-                    child.string = doc_title
-                elif child.attrs == {'border': '0', 'width': '92%', 'style': 'margin-left:-3pt;',
-                                     'cellpadding': '0', 'bgcolor': '#6699cc', 'cellspacing': '0'}:
+                    input_title_content = input_child.tbody.tr.find_all('td', recursive=False)[1]
+
+                    h1_tag = output_soup.new_tag('h1')
+                    convert_document2(input_title_content, h1_tag, output_soup)
+
+                    doc_title = h1_tag.string
+                    if not doc_title:
+                        doc_title = ''
+                        for t in h1_tag:
+                            if isinstance(t, bs4.NavigableString):
+                                doc_title += t.string
+
+                    logging.debug('title={}'.format(doc_title))
+                elif input_child.attrs == {'border': '0', 'width': '92%', 'style': 'margin-left:-3pt;',
+                                           'cellpadding': '0', 'bgcolor': '#6699cc', 'cellspacing': '0'}:
                     logging.debug('Sub heading')
 
-                    sub_heading = child.tbody.tr.td.string
+                    if (len(input_child.tbody.find_all('tr', recursive=False)) != 1 or
+                            len(input_child.tbody.tr.find_all('td', recursive=False)) != 1):
+                        logging.error('Unexpected tr/td count')
+                        sys.exit()
 
-                    child.name = 'h2'
-                    child.attrs = {}
-                    child.string = sub_heading
-                elif child.attrs == {'rules': 'none', 'width': '60%', 'cellspacing': '1',
-                                     'style': 'border-bottom: red 1px solid; border-top: red 1px solid;border-right: red 1px solid;border-left: red 1px solid;',
-                                     'border': '0', 'bgcolor': 'white'}:
+                    #sub_heading = input_child.tbody.tr.td.string
+
+                    h2_tag = output_soup.new_tag('h2')
+                    # TODO remove <b> element? (e.g. in doc33205.htm)
+                    convert_document2(input_child.tbody.tr.td, h2_tag, output_soup)
+
+                    output.append(h2_tag)
+                elif input_child.attrs == {'rules': 'none', 'width': '60%', 'cellspacing': '1',
+                                           'style': 'border-bottom: red 1px solid; border-top: red 1px solid;border-right: red 1px solid;border-left: red 1px solid;',
+                                           'border': '0', 'bgcolor': 'white'}:
                     logging.debug('Warning tag')
 
-                    warning_table = child.table.tbody.tr.td
+                    warning_tag = output_soup.new_tag('div')
+                    warning_tag['class'] = ['alert', 'alert-danger']
 
-                    convert_document(soup, warning_table)
-                    print(child.table.tbody.tr.td)
+                    logging.debug('Entering warning')
+                    tr_tags = input_child.table.table.tbody.find_all('tr', recursive=False)
+                    if len(tr_tags) != 3:
+                        logging.error('Warning tag tr count missmatch')
+                        sys.exit()
 
-                    p_tags = warning_table.find_all('p', recursive=False)
-                    print('ptags: ',p_tags)
+                    title_input_tags = tr_tags[0].find_all('td', recursive=False)
+                    if len(title_input_tags) != 1:
+                        logging.error('Warning tag title td count missmatch')
+                        sys.exit()
 
-                    p_tags[1].unwrap()
-                    p_tags[0].name = 'h4'
-                    p_tags[0]['class'] = ['alert-heading']
+                    contents_input_tags = tr_tags[1].find_all('td', recursive=False)
+                    if len(contents_input_tags) != 1:
+                        logging.error('Warning tag contents td count missmatch')
+                        sys.exit()
 
-                    warning_table.name = 'div'
-                    warning_table['class'] = ['alert', 'alert-danger']
+                    title_tag = output_soup.new_tag('h4')
+                    title_tag.attrs = {'class': ['alert-heading']}
+                    convert_document2(title_input_tags[0], title_tag, output_soup)
+                    warning_tag.append(title_tag)
 
-                    warning_table.extract()
-                    child.replace_with(warning_table)
-                elif child.attrs == {'width': '60%', 'bordercolor': '#000000', 'bgcolor': 'f8f8f8', 'rules': 'none',
-                                     'cellpadding': '5', 'frame': 'hsides', 'cellspacing': '0'}:
+                    convert_document2(contents_input_tags[0], warning_tag, output_soup)
+
+                    logging.debug('Leaving warning')
+
+                    output.append(warning_tag)
+
+                elif input_child.attrs == {'width': '60%', 'bordercolor': '#000000', 'bgcolor': 'f8f8f8',
+                                           'rules': 'none', 'cellpadding': '5', 'frame': 'hsides', 'cellspacing': '0'}:
                     logging.debug('Observe tag')
 
-                    child.attrs = {}
-                    observe_tag = soup.new_tag('div')
+                    observe_tag = output_soup.new_tag('div')
                     observe_tag['class'] = ['alert', 'alert-warning']
-                    child.wrap(observe_tag)
 
-                    convert_document(soup, observe_tag)
+                    convert_document2(input_child, observe_tag, output_soup)
 
-                    observe_tag.contents[0].name = 'h4'
-                    observe_tag.contents[0]['class'] = ['alert-heading']
+                    title_tag = observe_tag.p
+                    title_tag.name = 'h4'
+                    title_tag.attrs = {'class': ['alert-heading']}
+
+                    output.append(observe_tag)
+                elif input_child.attrs == {'rules': 'none', 'bgcolor': 'f8f8f8', 'frame': 'void', 'width': '60%'}:
+                    logging.debug('Note tag')
+
+                    note_tag = output_soup.new_tag('div')
+                    note_tag['class'] = ['alert', 'alert-info']
+
+                    convert_document2(input_child, note_tag, output_soup)
+
+                    title_tag = note_tag.p
+                    title_tag.name = 'h4'
+                    title_tag.attrs = {'class': ['alert-heading']}
+
+                    output.append(note_tag)
                 else:
-                    logging.debug('Assuming general table')
+                    logging.debug('General table')
 
-                    for row in child.tbody.find_all('tr', recursive=False):
-                        columns = row.find_all('td', recursive=False)
-                        if len(columns) == 1:
-                            columns[0].name = 'p'
-                            columns[0].attrs = {}
+                    convert_document2(input_child, output, output_soup)
 
-                            convert_document(soup, columns[0])
+            elif input_child.name == 'colgroup':
 
-                            row.unwrap()
-                            #unwrap_and_advance(row, iterator)
-                        elif len(columns) == 2:
-                            left_col, right_col = columns
+                table_tag = output_soup.new_tag('table')
+                colgroup_tag = output_soup.new_tag('colgroup')
 
-                            convert_document(soup, right_col)
+                for col in input_child.find_all('col', recursive=False):
+                    if 'width' not in col.attrs:
+                        logging.error('Width attribute not in col')
+                        sys.exit()
 
-                            if ordered_list_regex.match(left_col.string):
-                                list_item_index = int(left_col.string[:-1])
+                    if len(col.attrs) != 1:
+                        logging.error('Col attribute length mismatch')
+                        sys.exit()
 
-                                list_item = soup.new_tag('li')
-                                for c in right_col.contents:
-                                    list_item.append(copy.copy(c))
+                    col_tag = output_soup.new_tag('col')
+                    col_tag.attrs = {'style': 'width:{}'.format(col['width'])}
+                    colgroup_tag.append(col_tag)
 
-                                print(list_item_index)
-                                if list_item_index == 1:
-                                    current_list = soup.new_tag('ol')
-                                    row.replace_with(current_list)
-                                elif current_list.name != 'ol':
-                                    logging.error('List mismatch')
-                                    sys.exit()
-                                elif not current_list or len(current_list.contents) + 1 != list_item_index:
-                                    logging.error('List index error')
-                                    sys.exit()
-                                else:
-                                    row.replace_with('\n')
+                table_tag.append(colgroup_tag)
+                table_tag.append(output_soup.new_tag('tbody'))
+                output.append(table_tag)
 
-                                current_list.append(list_item)
-                            elif left_col.string == '•':
+                element_stack.append(StackElement(level_count, table_tag))
+            elif input_child.name == 'tbody':
+                logging.debug('Processing tbody')
 
-                                list_item = soup.new_tag('li')
-                                for list_content in right_col.children:
-                                    list_item.append(copy.copy(list_content))
+                # Level
+                indentation_level = 0
+                first_td = input_child.tr.find_all('td', recursive=False)[0]
+                if not first_td.contents and first_td.attrs == {'width': '20'}:
+                    if len(input_child.find_all('tr', recursive=False)) != 1:
+                        logging.error('Expected one tr tag with indentations')
+                        sys.exit()
 
-                                if current_list and current_list.name == 'ul':
-                                    row.replace_with('\n')
-                                else:
-                                    current_list = soup.new_tag('ul')
-                                    row.replace_with(current_list)
+                    indentation_level = 1  # TODO
 
-                                current_list.append(list_item)
-                            else:
-                                print('List with "{}", not implemented'.format(left_col.string))
-                                sys.exit()
+                current_list = None
+                if element_stack and element_stack[-1].level == level_count:
+                    current_list = element_stack[-1].element
 
-                        else:
-                            logging.error('Parsing table with more than 3 columns is not implemented yet')
+                for row in input_child.find_all('tr', recursive=False):
+                    columns = row.find_all('td', recursive=False)
+
+                    if len(columns) == 2 and columns[0].string and ordered_list_regex.match(columns[0].string):
+                        # Ordered list (123...)
+                        logging.debug('Ordered list')
+                        left_col, right_col = columns
+
+                        if indentation_level != 0:
+                            logging.error('Indentation for ordered list is not implemented')
                             sys.exit()
 
-                    if not child.contents:
-                        child.replace_with('\n')
-                    else:
-                        child.tbody.unwrap()
-                        unwrap_and_advance(child, iterator)
-            elif child.name == 'div' or child.name == 'span' or child.name == 'p':
-                child.insert(0, '\n')
-                child.unwrap()
-            elif child.name == 'img':
-                if child['src'] == 'link.gif':
-                    glyph_icon = soup.new_tag('span')
-                    glyph_icon['class'] = ['glyphicon', 'glyphicon-link']
-                    child.replace_with(glyph_icon)
-                elif child['src'] == 'attention.gif':
-                    glyph_icon = soup.new_tag('span')
-                    glyph_icon['class'] = ['glyphicon', 'glyphicon-warning-sign']
-                    child.replace_with(glyph_icon)
-                else:
-                    logging.error('Unknown image {}'.format(img['src']))
-                    sys.exit()
+                        list_item = output_soup.new_tag('li')
 
-            elif child.name == 'a':
-                if not child.contents and 'name' in child.attrs:
-                    if is_int(child['name']):
-                        child.replace_with('\n')
+                        convert_document2(right_col, list_item, output_soup)
+
+                        list_item_index = int(left_col.string[:-1])
+
+                        if list_item_index == 1:
+                            current_list = output_soup.new_tag('ol')
+                            output.append(current_list)
+                            element_stack.append(StackElement(level_count, current_list))
+                        elif current_list and (current_list.name != 'ol' or 'style' in current_list.attrs):
+                            logging.error('List mismatch')
+                            sys.exit()
+                        elif not current_list or len(current_list.contents) + 1 != list_item_index:
+                            logging.error('List index error')
+                            sys.exit()
+
+                        current_list.append(list_item)
+                    elif len(columns) == 2 and columns[0].string == '•':
+                        # Unordered list (•)
+                        left_col, right_col = columns
+
+                        if indentation_level != 0:
+                            logging.error('Indentation for unordered list is not implemented')
+                            sys.exit()
+
+                        list_item = output_soup.new_tag('li')
+
+                        convert_document2(right_col, list_item, output_soup)
+
+                        if current_list and current_list.name == 'ul':
+                            pass
+                        else:
+                            current_list = soup.new_tag('ul')
+                            output.append(current_list)
+                            element_stack.append(StackElement(level_count, current_list))
+
+                        current_list.append(list_item)
+                    elif len(columns) == 3 and columns[1].string and columns[1].string == '•':
+                        # Unordered sublist (•)
+                        _, left_col, right_col = columns
+
+                        if indentation_level == 0:
+                            logging.error('No indentation for unordered sublist')
+                            sys.exit()
+
+                        if not current_list:
+                            logging.error('No parent list for unordered sublist')
+                            sys.exit()
+
+                        if not current_list.contents:
+                            logging.error('Empty parent list for unordered sublist')
+                            sys.exit()
+
+                        last_element = current_list.contents[-1]
+                        if (not last_element.contents or last_element.contents[-1].name != 'ul'
+                                or last_element.contents[-1].attrs != {'style': "list-style-type:circle"}):
+                            sublist = output_soup.new_tag('ul')
+                            sublist.attrs = {'style': "list-style-type:circle"}
+
+                            last_element.append(sublist)
+                        else:
+                            sublist = last_element.contents[-1]
+
+                        sublist_item = output_soup.new_tag('li')
+                        convert_document2(right_col, sublist_item, output_soup)
+                        sublist.append(sublist_item)
+                    elif len(columns) == 3 and columns[1].string and columns[1].string == '-':
+                        # Unordered sublist (-)
+                        _, left_col, right_col = columns
+
+                        if indentation_level == 0:
+                            logging.error('No indentation for unordered sublist')
+                            sys.exit()
+
+                        if not current_list:
+                            logging.error('No parent list for unordered sublist')
+                            sys.exit()
+
+                        if not current_list.contents:
+                            logging.error('Empty parent list for unordered sublist')
+                            sys.exit()
+
+                        last_element = current_list.contents[-1]
+                        if (not last_element.contents or last_element.contents[-1].name != 'ul'
+                                or last_element.contents[-1].attrs != {'style': "list-style-type:'-  '"}):
+                            sublist = output_soup.new_tag('ul')
+                            sublist.attrs = {'style': "list-style-type:'-  '"}
+
+                            last_element.append(sublist)
+                        else:
+                            sublist = last_element.contents[-1]
+
+                        sublist_item = output_soup.new_tag('li')
+                        convert_document2(right_col, sublist_item, output_soup)
+                        sublist.append(sublist_item)
+                    elif len(columns) == 3 and columns[1].string and ordered_list_alpha_regex.match(columns[1].string):
+                        # Ordered sublist (abc...)
+                        _, left_col, right_col = columns
+
+                        if indentation_level == 0:
+                            logging.error('No indentation for ordered sublist')
+                            sys.exit()
+
+                        if not current_list:
+                            logging.error('No parent list for unordered sublist')
+                            sys.exit()
+
+                        if not current_list.contents:
+                            logging.error('Empty parent list for unordered sublist')
+                            sys.exit()
+
+                        last_element = current_list.contents[-1]
+                        if (not last_element.contents or last_element.contents[-1].name != 'ol'
+                                or last_element.contents[-1].attrs != {'style': 'list-style-type:lower-alpha'}):
+                            sublist = output_soup.new_tag('ol')
+                            sublist.attrs = {'style': 'list-style-type:lower-alpha'}
+
+                            last_element.append(sublist)
+                        else:
+                            sublist = last_element.contents[-1]
+
+                        sublist_item = output_soup.new_tag('li')
+                        convert_document2(right_col, sublist_item, output_soup)
+                        sublist.append(sublist_item)
+                    elif (len(columns) == 3 and columns[1].string
+                          and ordered_list_number_alpha_regex.match(columns[1].string)):
+                        # Ordered sublist (1.a 2.b 1.c...)
+                        _, left_col, right_col = columns
+
+                        if indentation_level == 0:
+                            logging.error('No indentation for ordered sublist')
+                            sys.exit()
+
+                        if not current_list:
+                            logging.error('No parent list for ordered sublist')
+                            sys.exit()
+
+                        if not current_list.contents:
+                            logging.error('Empty parent list for ordered sublist')
+                            sys.exit()
+
+                        last_element = current_list.contents[-1]
+                        if (not last_element.contents or last_element.contents[-1].name != 'ol'
+                                or last_element.contents[-1].attrs != {'style': 'list-style-type:lower-alpha'}):
+                            sublist = output_soup.new_tag('ol')
+                            sublist.attrs = {'style': 'list-style-type:lower-alpha'}
+
+                            last_element.append(sublist)
+                        else:
+                            sublist = last_element.contents[-1]
+
+                        sublist_item = output_soup.new_tag('li')
+                        convert_document2(right_col, sublist_item, output_soup)
+                        sublist.append(sublist_item)
+                    elif (len(columns) == 3 and columns[1].string
+                          and ordered_list_number_number_regex.match(columns[1].string)):
+                        # Ordered sublist (1.1 1.2 1.3...)
+                        _, left_col, right_col = columns
+
+                        if indentation_level == 0:
+                            logging.error('No indentation for ordered sublist')
+                            sys.exit()
+
+                        if not current_list:
+                            logging.error('No parent list for unordered sublist')
+                            sys.exit()
+
+                        if not current_list.contents:
+                            logging.error('Empty parent list for ordered sublist')
+                            sys.exit()
+
+                        last_element = current_list.contents[-1]
+                        if (not last_element.contents or last_element.contents[-1].name != 'ol'
+                                or last_element.contents[-1].attrs != {'style': 'list-style-type:decimal'}):
+                            sublist = output_soup.new_tag('ol')
+                            sublist.attrs = {'style': 'list-style-type:decimal'}
+
+                            last_element.append(sublist)
+                        else:
+                            sublist = last_element.contents[-1]
+
+                        sublist_item = output_soup.new_tag('li')
+                        convert_document2(right_col, sublist_item, output_soup)
+                        sublist.append(sublist_item)
+                    elif len(columns) == 1 and 'rowspan' not in columns[0].attrs:
+                        if output.name == 'p':
+                            # Prevent nesting of p-tags
+                            # TODO maybe we should remove the p-tag in output instead
+                            convert_document2(columns[0], output, output_soup)
+                        else:
+                            p_tag = output_soup.new_tag('p')
+                            convert_document2(columns[0], p_tag, output_soup)
+                            if p_tag.contents:
+                                output.append(p_tag)
                     else:
-                        child.name = 'span'
-                        child.attrs = {'id': child['name']}
-                elif 'href' in child.attrs:
-                    if child['href'].startswith('wisimg://i'):
+                        # Normal table (N columns)
+                        if indentation_level != 0:
+                            logging.error('Unexpected indentation for table')
+                            sys.exit()
+
+                        if current_list and current_list.name != 'table':
+                            element_stack.pop()
+                            current_list = None
+
+                        if not current_list:
+                            current_list = output_soup.new_tag('table')
+                            current_list.append(output_soup.new_tag('tbody'))
+                            output.append(current_list)
+                            element_stack.append(StackElement(level_count, current_list))
+
+                        tr_tag = output_soup.new_tag('tr')
+
+                        for col in columns:
+                            td_tag = output_soup.new_tag('td')
+
+                            convert_document2(col, td_tag, output_soup)
+                            colspan = col.attrs.get('colspan', '1')
+                            rowspan = col.attrs.get('rowspan', '1')
+
+                            if colspan != '1':
+                                td_tag['colspan'] = colspan
+                            if rowspan != '1':
+                                td_tag['rowspan'] = rowspan
+
+                            tr_tag.append(td_tag)
+
+                        current_list.tbody.append(tr_tag)
+            elif input_child.name == 'a':
+                if not input_child.contents and 'name' in input_child.attrs:
+                    if is_int(input_child['name']):
+                        logging.debug('Skipping section tag "{}"'.format(input_child['name']))
+                    else:
+                        logging.debug('Appending section tag "{}"'.format(input_child['name']))
+                        section_tag = output_soup.new_tag('span')
+                        section_tag.attrs = {'id': input_child['name']}
+                        output.append(section_tag)
+                elif 'href' in input_child.attrs:
+                    if input_child['href'].startswith('wisimg://i'):
                         # Image reference
 
-                        img_id = child['href'][10:]
+                        img_id = input_child['href'][10:]
                         extension = img_extensions.get(img_id, None)
 
-                        if not extension:
-                            print('Error: Unable to find image {}'.format(img_id))
+                        if not img_id:
+                            logging.warning('Broken image reference')
+                            # TODO
+                            """
+                            <div class="broken-image-ref">
+                              <span class="broken-image-ref-icon glyphicon glyphicon glyphicon-ban-circle"></span>
+                              <div class="broken-image-ref-description">
+                                <i>Broken image reference</i>
+                              </div>
+                            </div>
+                            .broken-image-ref {
+                              width: 300px;
+                              height: 300px;
+                              border: 1px solid black;
+                              position: relative;
+                            }
+                            
+                            .broken-image-ref-icon {
+                              font-size: 100px;
+                              width: 75px;
+                              height: 75px;
+                              position: absolute;
+                              top: 50%;
+                              left: 50%;
+                              margin: -50px 0 0 -50px;
+                            }
+                            
+                            .broken-image-ref-description {
+                              width:100%;
+                              position: absolute;
+                              bottom: 0;
+                              left: 0;
+                              text-align:center;
+                            }
+                            """
 
-                        figure_tag = soup.new_tag('figure')
+                        elif not extension:
+                            logging.error('Error: Unable to find image {}'.format(img_id))
+                            sys.exit()
 
-                        img_tag = soup.new_tag('img')
+                        figure_tag = output_soup.new_tag('figure')
+
+                        img_tag = output_soup.new_tag('img')
                         img_tag['src'] = '/static/data/images/{}.{}'.format(img_id, extension)
                         img_tag['width'] = '300'
                         img_tag['alt'] = img_id
@@ -292,34 +606,65 @@ def convert_document(soup, element):
                         # figcaption_tag.append('caption goes here')
                         # figure_tag.append(figcaption_tag)
 
-                        child.replace_with(figure_tag)
-                    elif child['href'].startswith('wisref://c'):
+                        output.append(figure_tag)
+                    elif input_child['href'].startswith('wisref://c'):
                         # Menu reference
 
-                        link_ref_id = link['href'][10:]
+                        link_ref_id = input_child['href'][10:]
 
-                        child['href'] = 'javascript:void(0)'
-                        child['onclick'] = 'open_menu({})'.format(link_ref_id)
-                    elif child['href'].startswith('wisref://l'):
+                        menu_reference_tag = output_soup.new_tag('a')
+                        menu_reference_tag['href'] = '/{}'.format(link_ref_id)
+                        menu_reference_tag['class'] = ['doc-ref']
+
+                        output.append(menu_reference_tag)
+                        convert_document2(input_child, menu_reference_tag, output_soup)
+                    elif input_child['href'].startswith('wisref://l'):
                         # Page reference
 
-                        link_ref_id = link['href'][10:]
+                        link_ref_id = input_child['href'][10:]
 
-                        child['href'] = 'javascript:void(0)'
-                        child['onclick'] = 'open_doc({})'.format(link_ref_id)
+                        page_reference_tag = output_soup.new_tag('a')
+                        page_reference_tag['href'] = 'javascript:void(0)'
+                        page_reference_tag['onclick'] = 'open_doc({})'.format(link_ref_id)
+
+                        output.append(page_reference_tag)
+                        convert_document2(input_child, page_reference_tag, output_soup)
                     else:
-                        logging.error('Unknown reference ({})'.format(link['href']))
+                        logging.error('Unknown reference ({})'.format(input_child['href']))
                         sys.exit()
+            elif input_child.name == 'img':
+                if input_child['src'] == 'link.gif' or input_child['src'] == 'sclink.gif':
+                    glyph_icon = output_soup.new_tag('span')
+                    glyph_icon['class'] = ['glyphicon', 'glyphicon-link']
+                    output.append(glyph_icon)
+                elif input_child['src'] == 'attention.gif':
+                    glyph_icon = output_soup.new_tag('span')
+                    glyph_icon['class'] = ['glyphicon', 'glyphicon-warning-sign']
+                    output.append(glyph_icon)
+                elif input_child['src'] == 'FSanim3.gif':
+                    pass  # TODO
                 else:
-                    logging.error('Unknown a-tag')
+                    logging.error('Unknown image {}'.format(input_child['src']))
                     sys.exit()
             else:
-                print('Error: Unknown tag {}'.format(child.name))
-                print(child)
+                logging.error('Unknown tag "{}"'.format(input_child.name))
                 sys.exit()
-
         else:
-            print('Error: Unexpected bs4 element ({})'.format(type(child)))
+            logging.error('Unknown element type "{}"'.format(type(input_child)))
+            sys.exit()
+
+    level_count -= 1
+
+    # Clear element_stack
+    new_element_stack = []
+    for e in element_stack:
+        if e.level - 3 <= level_count:
+            new_element_stack.append(e)
+        else:
+            logging.debug('Removing element_stack')
+            #logging.debug(e.element)
+
+    element_stack = new_element_stack
 
 
 for file_path in sorted(doc_files):
@@ -340,111 +685,44 @@ for file_path in sorted(doc_files):
 
     # Error if we find any script
     if soup.find('script'):
-        print('Error: Unable to remove all script tags from {}'.format(file_path))
+        logging.error('Error: Unable to remove all script tags from {}'.format(file_path))
         sys.exit()
 
-    convert_document(soup, soup.body)
+    output = BeautifulSoup(features='html5lib')
 
-    for p in soup.find_all('p'):
-        if p.attrs == {'style': 'margin-top:3pt;margin-bottom;10pt;'} or p.attrs == {'style': 'margin-bottom:5pt;'}:
-            #del p['style']
-            p.replace_with_children()
-
-    for img in soup.find_all('img'):
-        if img['src'] == 'link.gif':
-            glyph_icon = soup.new_tag('span')
-            glyph_icon['class'] = 'glyphicon glyphicon-link'
-            img.replace_with(glyph_icon)
-
-    # Remove span tags with style=position:relative
-    for span in soup.find_all('span'):
-        if span.attrs == {'style': 'position:relative'}:
-            #del span['style']
-            #span.name = 'p'
-            span.replaceWithChildren()
-
-    # Remove empty div tags
-    for div in soup.find_all('div'):
-        if not div.attrs or div.attrs == {'style': 'margin-left:20pt;margin-right:5pt;'}:
-            div.replaceWithChildren()
-
-    for link in soup.find_all('a'):
-        if not link.contents:
-            pass
-            #print('No contents in a tag. Removing')
-            #link.extract()
-        elif link['href'].startswith('wisref://l'):
-            # Page reference
-
-            link_ref_id = link['href'][10:]
-            if doc_id not in links:
-                print('Error: Unable to find reference {} for doc{}'.format(link_ref_id, doc_id))
-                continue
-
-            link_real_ref = links[doc_id][link_ref_id]
-
-            link['href'] = 'javascript:void(0)'
-
-            if doc_count == 662:
-                pass
-            # Is this a reference to a doc
-            if link_real_ref in link_ref:
-                link['onclick'] = 'open_doc({})'.format(link_ref[link_real_ref])
-            # Is this a reference to part of a doc
-            elif link_real_ref in link_subref:
-                link['onclick'] = 'open_sub_doc({}, {})'.format(link_subref[link_real_ref][0], link_subref[link_real_ref][1])
-            else:
-                print('Error: Unable to follow reference id={}'.format(link_real_ref))
-                sys.exit()
-        elif link['href'].startswith('wisref://c'):
-            # Menu reference
-
-            link_ref_id = link['href'][10:]
-
-        elif link['href'].startswith('wisimg://'):
-            img_count += 1
-            img_id = link['href'][10:]
-
-            extension = img_extensions.get(img_id, None)
-
-            if not extension:
-                print('Error: Unable to find image {}'.format(img_id))
-                img_fail_count += 1
-                img_fail_list.append(file_path)
-
-            figure_tag = soup.new_tag('figure')
-
-            img_tag = soup.new_tag('img')
-            img_tag['src'] = '/static/data/images/{}.{}'.format(img_id,
-                                                                extension)
-            img_tag['width'] = '300'
-            img_tag['alt'] = ''
-
-            figure_tag.append(img_tag)
-
-            #figcaption_tag = soup.new_tag('figcaption')
-            #figcaption_tag.append('caption goes here')
-            #figure_tag.append(figcaption_tag)
-
-            link.replace_with(figure_tag)
-        else:
-            print('Warning: Unknown reference ({})'.format(link['href']))
     # Insert doctype
-    img_tag = soup.new_tag("!DOCTYPE")
-    doctype_tag = Doctype('html')
-    soup.insert(0, doctype_tag)
+    doctype_tag = bs4.Doctype('html')
+    output.insert(0, doctype_tag)
+
+    # Set language
+    output.html['lang'] = 'se'
+
+    # Set charset
+    meta_tag = output.new_tag('meta')
+    meta_tag.attrs = {'charset': 'utf-8'}
+    output.head.append(meta_tag)
+
+    # Add bootstrap css
+    link_tag = output.new_tag('link')
+    link_tag['rel'] = 'stylesheet'
+    link_tag['href'] = 'https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css'
+    link_tag['integrity'] = 'sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u'
+    link_tag['crossorigin'] = 'anonymous'
+    output.head.append(link_tag)
+
+    convert_document2(soup.body, output.body, output)
 
     # Insert shit into html tag
     title_tag = soup.new_tag('title')
     if doc_title:
         title_tag.append(doc_title)
-    soup.find('head').append(title_tag)
-
-    del soup.find('body')['style']
+    output.find('head').append(title_tag)
 
     # Generate HTML source code
-    html_source = soup.prettify()
-    # html_source = html_source.replace('</br>', '').replace('<br>', '<br/>')
+    html_source = output.prettify()
+
+    # To make the HTML5 valid
+    html_source = html_source.replace('</col>', '')
 
     # html_source = htmlmin.minify(html_source, remove_comments=True)
 
