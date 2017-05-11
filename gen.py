@@ -102,7 +102,7 @@ for sct in soup.findAll('sct'):
             'href': '#{}'.format(sc_id),
             'data-id': sc_id,
         })
-        print('\t',sc.find('name').contents[0], '({})'.format(sc_id))
+        print('\t', sc.find('name').contents[0], '({})'.format(sc_id))
 
         submenus[sc_id] = {}
         for sit in sc.findAll('sit'):

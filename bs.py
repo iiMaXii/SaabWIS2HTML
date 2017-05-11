@@ -14,8 +14,22 @@ import datetime
 import re
 import json
 
-from bs4 import BeautifulSoup
 import bs4
+
+
+def is_int(s):
+    try:
+        int(s)
+        return True
+    except ValueError:
+        return False
+
+
+class StackElement:
+    def __init__(self, level: int, element: bs4.Tag):
+        self.level = level
+        self.element = element
+
 
 LANGUAGE = 'se'
 DIRECTORY = os.path.join('static', 'data', LANGUAGE)
@@ -31,35 +45,35 @@ replacements = {
     '<SCRIPT LANGUAGE="JavaScript">\n\tfunction GetIEVersion()\n\t{\n\t\tmsieIndex = navigator.appVersion.indexOf("MSIE") + 5;\n\t\tvar floatVersion = parseFloat(navigator.appVersion.substr(msieIndex,3));\n\t\treturn floatVersion;\n\t}\n\tfunction GetImagePosLeft()\n\t{\n\t\tvar IEVersion = GetIEVersion();\n\t\tif (IEVersion > 5.01)\n\t\t\tdocument.write("<DIV style=\'position:absolute;left:-20;top:0\'>");\n\t\telse\n\t\t\tdocument.write("<DIV style=\'position:absolute;left:0;top:0\'>");\n\t}\n\t</SCRIPT>': '',
 }
 
+ordered_list_regex = re.compile("\d+\.")
+ordered_list_alpha_regex = re.compile("[a-z]\.")
+ordered_list_number_alpha_regex = re.compile("\d+\.[A-Za-z]\.")
+ordered_list_number_number_regex = re.compile("\d+\.\d+\.")
+
 # Read links
 doc_list = []
-links = None
-link_ref = None
-link_subref = None
+# links = None
+# link_ref = None
+# link_subref = None
 
 try:
     f = open('tmp/doc_list.json')
     doc_list = json.load(f)
 
-    f = open('tmp/links.json')
+    """f = open('tmp/links.json')
     links = json.load(f)
 
     f = open('tmp/link_ref.json')
     link_ref = json.load(f)
 
     f = open('tmp/link_subref.json')
-    link_subref = json.load(f)
+    link_subref = json.load(f)"""
 except (IOError, OSError) as e:
     pass
 
-if not doc_list or not links or not link_ref or not link_subref:
+if not doc_list:  # or not links or not link_ref or not link_subref:
     print('Error: Please run gen.py first')
     sys.exit()
-
-ordered_list_regex = re.compile("\d+\.")
-ordered_list_alpha_regex = re.compile("[a-z]\.")
-ordered_list_number_alpha_regex = re.compile("\d+\.[A-Za-z]\.")
-ordered_list_number_number_regex = re.compile("\d+\.\d+\.")
 
 img_extensions = {}
 for f in os.listdir(IMG_DIRECTORY):
@@ -67,73 +81,52 @@ for f in os.listdir(IMG_DIRECTORY):
         filename, extension = f.rsplit('.', 1)
         img_extensions[filename] = extension
 
-#16088#abc
-#doc16615
-
 doc_list = doc_list[doc_list.index('42844'):]
-#doc_list = [42844]
+# doc_list = [42844]
 
 doc_files = [os.path.join(DIRECTORY, 'doc{}.htm'.format(doc_id)) for doc_id in doc_list]
 
+
+# Global variables for parsing
 img_count = 0
 img_fail_count = 0
 img_fail_list = []
 doc_count = 0
 
-dt_start = datetime.datetime.now()
-
-
-def is_int(s):
-    try:
-        int(s)
-        return True
-    except ValueError:
-        return False
-
-logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
-
-# Meh
 doc_title = None
-
-
-class StackElement:
-    def __init__(self, level: int, element: bs4.Tag):
-        self.level = level
-        self.element = element
-
 
 element_stack = []  # Lists and tables
 level_count = 0
 
 
-def convert_document2(input, output: bs4.Tag, output_soup: bs4.BeautifulSoup) -> None:
+def convert_document2(input_tag: bs4.Tag, output_tag: bs4.Tag, output_soup: bs4.BeautifulSoup) -> None:
     global doc_title, element_stack, level_count
 
     level_count += 1
     logging.debug('level_count={}'.format(level_count))
 
-    logging.debug('Looping {}'.format(input.name))
-    for input_child in input.contents:
+    logging.debug('Looping {}'.format(input_tag.name))
+    for input_child in input_tag.contents:
         logging.debug('Processing {} ({})'.format(input_child.name, input_child))
         if isinstance(input_child, bs4.NavigableString):
             logging.debug('Appending string "{}"'.format(str(input_child)))
-            output.append(str(input_child))
+            output_tag.append(str(input_child))
         elif isinstance(input_child, bs4.Comment):
             logging.debug('Skipping comment')
         elif isinstance(input_child, bs4.Tag):
             logging.debug(input_child.attrs)
             if input_child.name == 'div' or input_child.name == 'span' or input_child.name == 'p':
-                convert_document2(input_child, output, output_soup)
+                convert_document2(input_child, output_tag, output_soup)
             elif (input_child.name == 'i' or input_child.name == 'b' or input_child.name == 'sup'
                   or input_child.name == 'sub' or input_child.name == 'u'):
                 # TODO maybe replace <u> with <span style="text-decoration:underline;">
                 tag = output_soup.new_tag(input_child.name)
-                output.append(tag)
+                output_tag.append(tag)
                 convert_document2(input_child, tag, output_soup)
             elif input_child.name == 'h2':
                 h3_tag = output_soup.new_tag('h3')
                 convert_document2(input_child, h3_tag, output_soup)
-                output.append(h3_tag)
+                output_tag.append(h3_tag)
             elif input_child.name == 'meta':
                 if input_child.attrs == {'http-equiv': 'Content-Type', 'content': 'text/html; charset=windows-1252'}:
                     pass  # Ignore
@@ -183,15 +176,14 @@ def convert_document2(input, output: bs4.Tag, output_soup: bs4.BeautifulSoup) ->
                         logging.error('Unexpected tr/td count')
                         sys.exit()
 
-                    #sub_heading = input_child.tbody.tr.td.string
-
                     h2_tag = output_soup.new_tag('h2')
                     # TODO remove <b> element? (e.g. in doc33205.htm)
                     convert_document2(input_child.tbody.tr.td, h2_tag, output_soup)
 
-                    output.append(h2_tag)
+                    output_tag.append(h2_tag)
                 elif input_child.attrs == {'rules': 'none', 'width': '60%', 'cellspacing': '1',
-                                           'style': 'border-bottom: red 1px solid; border-top: red 1px solid;border-right: red 1px solid;border-left: red 1px solid;',
+                                           'style': ('border-bottom: red 1px solid; border-top: red 1px solid;'
+                                                     'border-right: red 1px solid;border-left: red 1px solid;'),
                                            'border': '0', 'bgcolor': 'white'}:
                     logging.debug('Warning tag')
 
@@ -214,16 +206,16 @@ def convert_document2(input, output: bs4.Tag, output_soup: bs4.BeautifulSoup) ->
                         logging.error('Warning tag contents td count missmatch')
                         sys.exit()
 
-                    title_tag = output_soup.new_tag('h4')
-                    title_tag.attrs = {'class': ['alert-heading']}
-                    convert_document2(title_input_tags[0], title_tag, output_soup)
-                    warning_tag.append(title_tag)
+                    heading_tag = output_soup.new_tag('h4')
+                    heading_tag.attrs = {'class': ['alert-heading']}
+                    convert_document2(title_input_tags[0], heading_tag, output_soup)
+                    warning_tag.append(heading_tag)
 
                     convert_document2(contents_input_tags[0], warning_tag, output_soup)
 
                     logging.debug('Leaving warning')
 
-                    output.append(warning_tag)
+                    output_tag.append(warning_tag)
 
                 elif input_child.attrs == {'width': '60%', 'bordercolor': '#000000', 'bgcolor': 'f8f8f8',
                                            'rules': 'none', 'cellpadding': '5', 'frame': 'hsides', 'cellspacing': '0'}:
@@ -234,11 +226,11 @@ def convert_document2(input, output: bs4.Tag, output_soup: bs4.BeautifulSoup) ->
 
                     convert_document2(input_child, observe_tag, output_soup)
 
-                    title_tag = observe_tag.p
-                    title_tag.name = 'h4'
-                    title_tag.attrs = {'class': ['alert-heading']}
+                    heading_tag = observe_tag.p
+                    heading_tag.name = 'h4'
+                    heading_tag.attrs = {'class': ['alert-heading']}
 
-                    output.append(observe_tag)
+                    output_tag.append(observe_tag)
                 elif input_child.attrs == {'rules': 'none', 'bgcolor': 'f8f8f8', 'frame': 'void', 'width': '60%'}:
                     logging.debug('Note tag')
 
@@ -247,15 +239,15 @@ def convert_document2(input, output: bs4.Tag, output_soup: bs4.BeautifulSoup) ->
 
                     convert_document2(input_child, note_tag, output_soup)
 
-                    title_tag = note_tag.p
-                    title_tag.name = 'h4'
-                    title_tag.attrs = {'class': ['alert-heading']}
+                    heading_tag = note_tag.p
+                    heading_tag.name = 'h4'
+                    heading_tag.attrs = {'class': ['alert-heading']}
 
-                    output.append(note_tag)
+                    output_tag.append(note_tag)
                 else:
                     logging.debug('General table')
 
-                    convert_document2(input_child, output, output_soup)
+                    convert_document2(input_child, output_tag, output_soup)
 
             elif input_child.name == 'colgroup':
 
@@ -277,7 +269,7 @@ def convert_document2(input, output: bs4.Tag, output_soup: bs4.BeautifulSoup) ->
 
                 table_tag.append(colgroup_tag)
                 table_tag.append(output_soup.new_tag('tbody'))
-                output.append(table_tag)
+                output_tag.append(table_tag)
 
                 element_stack.append(StackElement(level_count, table_tag))
             elif input_child.name == 'tbody':
@@ -317,7 +309,7 @@ def convert_document2(input, output: bs4.Tag, output_soup: bs4.BeautifulSoup) ->
 
                         if list_item_index == 1:
                             current_list = output_soup.new_tag('ol')
-                            output.append(current_list)
+                            output_tag.append(current_list)
                             element_stack.append(StackElement(level_count, current_list))
                         elif current_list and (current_list.name != 'ol' or 'style' in current_list.attrs):
                             logging.error('List mismatch')
@@ -343,7 +335,7 @@ def convert_document2(input, output: bs4.Tag, output_soup: bs4.BeautifulSoup) ->
                             pass
                         else:
                             current_list = soup.new_tag('ul')
-                            output.append(current_list)
+                            output_tag.append(current_list)
                             element_stack.append(StackElement(level_count, current_list))
 
                         current_list.append(list_item)
@@ -495,15 +487,15 @@ def convert_document2(input, output: bs4.Tag, output_soup: bs4.BeautifulSoup) ->
                         convert_document2(right_col, sublist_item, output_soup)
                         sublist.append(sublist_item)
                     elif len(columns) == 1 and 'rowspan' not in columns[0].attrs:
-                        if output.name == 'p':
+                        if output_tag.name == 'p':
                             # Prevent nesting of p-tags
                             # TODO maybe we should remove the p-tag in output instead
-                            convert_document2(columns[0], output, output_soup)
+                            convert_document2(columns[0], output_tag, output_soup)
                         else:
                             p_tag = output_soup.new_tag('p')
                             convert_document2(columns[0], p_tag, output_soup)
                             if p_tag.contents:
-                                output.append(p_tag)
+                                output_tag.append(p_tag)
                     else:
                         # Normal table (N columns)
                         if indentation_level != 0:
@@ -517,7 +509,7 @@ def convert_document2(input, output: bs4.Tag, output_soup: bs4.BeautifulSoup) ->
                         if not current_list:
                             current_list = output_soup.new_tag('table')
                             current_list.append(output_soup.new_tag('tbody'))
-                            output.append(current_list)
+                            output_tag.append(current_list)
                             element_stack.append(StackElement(level_count, current_list))
 
                         tr_tag = output_soup.new_tag('tr')
@@ -545,7 +537,7 @@ def convert_document2(input, output: bs4.Tag, output_soup: bs4.BeautifulSoup) ->
                         logging.debug('Appending section tag "{}"'.format(input_child['name']))
                         section_tag = output_soup.new_tag('span')
                         section_tag.attrs = {'id': input_child['name']}
-                        output.append(section_tag)
+                        output_tag.append(section_tag)
                 elif 'href' in input_child.attrs:
                     if input_child['href'].startswith('wisimg://i'):
                         # Image reference
@@ -606,7 +598,7 @@ def convert_document2(input, output: bs4.Tag, output_soup: bs4.BeautifulSoup) ->
                         # figcaption_tag.append('caption goes here')
                         # figure_tag.append(figcaption_tag)
 
-                        output.append(figure_tag)
+                        output_tag.append(figure_tag)
                     elif input_child['href'].startswith('wisref://c'):
                         # Menu reference
 
@@ -616,7 +608,7 @@ def convert_document2(input, output: bs4.Tag, output_soup: bs4.BeautifulSoup) ->
                         menu_reference_tag['href'] = '/{}'.format(link_ref_id)
                         menu_reference_tag['class'] = ['doc-ref']
 
-                        output.append(menu_reference_tag)
+                        output_tag.append(menu_reference_tag)
                         convert_document2(input_child, menu_reference_tag, output_soup)
                     elif input_child['href'].startswith('wisref://l'):
                         # Page reference
@@ -627,7 +619,7 @@ def convert_document2(input, output: bs4.Tag, output_soup: bs4.BeautifulSoup) ->
                         page_reference_tag['href'] = 'javascript:void(0)'
                         page_reference_tag['onclick'] = 'open_doc({})'.format(link_ref_id)
 
-                        output.append(page_reference_tag)
+                        output_tag.append(page_reference_tag)
                         convert_document2(input_child, page_reference_tag, output_soup)
                     else:
                         logging.error('Unknown reference ({})'.format(input_child['href']))
@@ -636,11 +628,11 @@ def convert_document2(input, output: bs4.Tag, output_soup: bs4.BeautifulSoup) ->
                 if input_child['src'] == 'link.gif' or input_child['src'] == 'sclink.gif':
                     glyph_icon = output_soup.new_tag('span')
                     glyph_icon['class'] = ['glyphicon', 'glyphicon-link']
-                    output.append(glyph_icon)
+                    output_tag.append(glyph_icon)
                 elif input_child['src'] == 'attention.gif':
                     glyph_icon = output_soup.new_tag('span')
                     glyph_icon['class'] = ['glyphicon', 'glyphicon-warning-sign']
-                    output.append(glyph_icon)
+                    output_tag.append(glyph_icon)
                 elif input_child['src'] == 'FSanim3.gif':
                     pass  # TODO
                 else:
@@ -662,10 +654,13 @@ def convert_document2(input, output: bs4.Tag, output_soup: bs4.BeautifulSoup) ->
             new_element_stack.append(e)
         else:
             logging.debug('Removing element_stack')
-            #logging.debug(e.element)
 
     element_stack = new_element_stack
 
+# Initiation
+logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
+
+dt_start = datetime.datetime.now()
 
 for file_path in sorted(doc_files):
     doc_count += 1
@@ -681,21 +676,21 @@ for file_path in sorted(doc_files):
     for old, new in replacements.items():
         source = source.replace(old, new)
 
-    soup = BeautifulSoup(source, 'html5lib')
+    soup = bs4.BeautifulSoup(source, 'html5lib')
 
-    # Error if we find any script
+    # Error if we find any script tag
     if soup.find('script'):
         logging.error('Error: Unable to remove all script tags from {}'.format(file_path))
         sys.exit()
 
-    output = BeautifulSoup(features='html5lib')
+    output = bs4.BeautifulSoup(features='html5lib')
 
     # Insert doctype
     doctype_tag = bs4.Doctype('html')
     output.insert(0, doctype_tag)
 
     # Set language
-    output.html['lang'] = 'se'
+    output.html['lang'] = LANGUAGE
 
     # Set charset
     meta_tag = output.new_tag('meta')
