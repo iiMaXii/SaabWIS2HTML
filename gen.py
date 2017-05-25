@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+Directory structure: 
+ - static/
+   - data/
+     - 
+
+9-5 (9600)/2006/
+ - menu.json (tree for first menu)
+ - tabs.json (tabs)
+ - submenus.json
+ - references.json (linkid -> docid)
+
+/c(\d+)
+<sc num="(\d+)">
+"""
+
 import glob
 import re
 import os
@@ -11,6 +27,7 @@ DIRECTORY = 'D:\\'
 MODEL = '9-5 (600)'
 
 OUTPUT_DIRECTORY = 'static/data'
+
 
 # Step 1
 """
@@ -55,10 +72,10 @@ import json
 
 soup = BeautifulSoup(open('C:/Users/iiMaXii/PycharmProjects/SaabWIS2HTML/static/data/views/9-5 (9600)2006se.xml', 'r'), 'html.parser')
 
-print("carmodel    : ", soup.modelyear['carmodel'])
-print("modelnumber : ", soup.modelyear['modelnumber'])
-print("modelnumber : ", soup.modelyear['modelyear'])
-print("language    : ", soup.modelyear['language'])
+print("carmodel    :", soup.modelyear['carmodel'])
+print("modelnumber :", soup.modelyear['modelnumber'])
+print("modelyear   :", soup.modelyear['modelyear'])
+print("language    :", soup.modelyear['language'])
 
 language_code = soup.modelyear['language']
 
@@ -71,21 +88,22 @@ if not os.path.exists(OUTPUT_DIRECTORY):
 if not os.path.exists(TMP_DIRECTORY):
     os.mkdir(TMP_DIRECTORY)
 
-tree_data = []
-
-tab_dict = {}
-tabs = []
+tree_data = []  # menu.json
+tab_dict = {}   # tabs.json
+submenus = {}   # submenus.json
 
 # output_2 = codecs.open(os.path.join(OUTPUT_DIRECTORY, sc_id + '.html'), 'w', 'utf-8')
-submenus = {}
+doc_list = []  # [docid, ...]
 
-doc_list = []
-link_ref = {}
+
 link_subref = {}
-links = {}
 
 
-docs_new = {}  # {id: {'menu': ?, 'tab': ?, 'doc': ?}, ...}
+# not implemented yet
+#ids = {}   # {id: docid}
+links = {}     # {linkid: id, ...}
+menu_links = {}
+docs_new = {}  # {id: {'menu': ?, 'tab': ?, 'doc': ?, 'anchor': ?}, ...}
 
 
 for sct in soup.findAll('sct'):
@@ -102,7 +120,15 @@ for sct in soup.findAll('sct'):
             'href': '#{}'.format(sc_id),
             'data-id': sc_id,
         })
-        print('\t', sc.find('name').contents[0], '({})'.format(sc_id))
+        #print('\t', sc.find('name').contents[0], '({})'.format(sc_id))
+
+        # links.setdefault(sie['docid'], {})[link['linkid']] = link['dest']
+        menu_links[sc['num']] = {
+            'menu': sc_id,
+            # 'tab': None,
+            # 'doc': None,
+            # 'anchor': None,
+        }
 
         submenus[sc_id] = {}
         for sit in sc.findAll('sit'):
@@ -117,17 +143,25 @@ for sct in soup.findAll('sct'):
                     'menu': sc_id,
                     'tab': sit['num'],
                     'doc': sie['docid'],
+                    #'anchor': None,
                 }
-                link_ref[sie['id']] = sie['docid']
+                #ids[sie['id']] = sie['docid']
 
                 children = []
 
                 # Get links
                 for link in sie.find_all('link'):
-                    links.setdefault(sie['docid'], {})[link['linkid']] = link['dest']
+                    #links.setdefault(sie['docid'], {})[link['linkid']] = link['dest']
+                    if link['linkid'] in links and link['dest'] != links[link['linkid']]:
+                        print('Error: Colliding link ids', link['linkid'])
+                        sys.exit()
+                    links[link['linkid']] = link['dest']
+
 
                 for sisub in sie.find_all('sisub'):
-                    link_subref[sisub['id']] = (sie['docid'], sisub['sisubid'])
+                    #links.setdefault(sie['docid'], {})
+                    link_subref[sisub['id']] = dict(docs_new[sie['id']])
+                    link_subref[sisub['id']]['anchor'] = sisub['sisubid']
 
                     sisub_name_contents = sisub.find('name').contents  # name tag might be empty for unknown reason
                     sisub_name = sisub_name_contents[0] if sisub_name_contents else 'null'
@@ -146,12 +180,13 @@ for sct in soup.findAll('sct'):
 
                 submenus[sc_id][sit['num']].append(submenu)
 
-with open(os.path.join(OUTPUT_DIRECTORY, 'doc.json'), 'w') as outfile:
-    json.dump(docs_new, outfile)
+#with open(os.path.join(OUTPUT_DIRECTORY, 'doc.json'), 'w') as outfile:
+#    json.dump(docs_new, outfile)
 
 with open(os.path.join(OUTPUT_DIRECTORY, 'menu.json'), 'w') as outfile:
     json.dump(tree_data, outfile)
 
+tabs = []
 for key, value in sorted(tab_dict.items()):
     tabs.append({
         'id': key,
@@ -164,15 +199,33 @@ with open(os.path.join(OUTPUT_DIRECTORY, 'tabs.json'), 'w') as outfile:
 with open(os.path.join(OUTPUT_DIRECTORY, 'submenus.json'), 'w') as outfile:
     json.dump(submenus, outfile)
 
+links_new = {}
+for link_id, link_dest in links.items():
+    if link_dest in docs_new:
+        links_new[link_id] = docs_new[link_dest]
+    elif link_dest in link_subref:
+        links_new[link_id] = link_subref[link_dest]
+    else:
+        raise Exception('Unknown destination id={}'.format(link_dest))
+
+for link_id, dest in menu_links.items():
+    if link_id in links_new:
+        print('Error: Collision with menu link id')
+        sys.exit()
+    links_new[link_id] = dest
+
+with open(os.path.join(OUTPUT_DIRECTORY, 'references.json'), 'w') as outfile:
+    json.dump(links_new, outfile)
+
 # Temporary files
 with open(os.path.join(TMP_DIRECTORY, 'doc_list.json'), 'w') as outfile:
     json.dump(doc_list, outfile)
 
-with open(os.path.join(TMP_DIRECTORY, 'links.json'), 'w') as outfile:
-    json.dump(links, outfile)
+#with open(os.path.join(TMP_DIRECTORY, 'links.json'), 'w') as outfile:
+#    json.dump(links, outfile)
 
-with open(os.path.join(TMP_DIRECTORY, 'link_ref.json'), 'w') as outfile:
-    json.dump(link_ref, outfile)
+#with open(os.path.join(TMP_DIRECTORY, 'link_ref.json'), 'w') as outfile:
+#    json.dump(ids, outfile)
 
-with open(os.path.join(TMP_DIRECTORY, 'link_subref.json'), 'w') as outfile:
-    json.dump(link_subref, outfile)
+#with open(os.path.join(TMP_DIRECTORY, 'link_subref.json'), 'w') as outfile:
+#    json.dump(link_subref, outfile)

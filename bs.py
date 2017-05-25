@@ -31,13 +31,17 @@ class StackElement:
         self.element = element
 
 
+TMP_DIRECTORY = 'tmp'
 LANGUAGE = 'se'
 DIRECTORY = os.path.join('static', 'data', LANGUAGE)
 IMG_DIRECTORY = os.path.join('static', 'data', 'images')
 
+if not os.path.exists(DIRECTORY):
+    os.makedirs(DIRECTORY)
+
 replacements = {
     # We probably don't need the br tags
-    '<BR>': '',
+    '<BR>': '',  # TODO, maybe preserve br-tags or make two br-tags a p-tag
     '<br>': '',
 
     # Some Javascript IE crap
@@ -84,8 +88,9 @@ for f in os.listdir(IMG_DIRECTORY):
 doc_list = doc_list[doc_list.index('42844'):]
 # doc_list = [42844]
 
-doc_files = [os.path.join(DIRECTORY, 'doc{}.htm'.format(doc_id)) for doc_id in doc_list]
-
+#doc_files = [os.path.join(DIRECTORY, 'doc{}.htm'.format(doc_id)) for doc_id in doc_list]
+doc_files = os.listdir(os.path.join(TMP_DIRECTORY, LANGUAGE))
+#doc_files = ['doc43058.htm']
 
 # Global variables for parsing
 img_count = 0
@@ -275,22 +280,17 @@ def convert_document2(input_tag: bs4.Tag, output_tag: bs4.Tag, output_soup: bs4.
             elif input_child.name == 'tbody':
                 logging.debug('Processing tbody')
 
-                # Level
-                indentation_level = 0
-                first_td = input_child.tr.find_all('td', recursive=False)[0]
-                if not first_td.contents and first_td.attrs == {'width': '20'}:
-                    if len(input_child.find_all('tr', recursive=False)) != 1:
-                        logging.error('Expected one tr tag with indentations')
-                        sys.exit()
-
-                    indentation_level = 1  # TODO
-
                 current_list = None
                 if element_stack and element_stack[-1].level == level_count:
                     current_list = element_stack[-1].element
 
                 for row in input_child.find_all('tr', recursive=False):
                     columns = row.find_all('td', recursive=False)
+
+                    # Level just for extra sanity
+                    indentation_level = 0
+                    if columns and not columns[0].contents:
+                        indentation_level = 1  # TODO levels deeper?
 
                     if len(columns) == 2 and columns[0].string and ordered_list_regex.match(columns[0].string):
                         # Ordered list (123...)
@@ -603,7 +603,7 @@ def convert_document2(input_tag: bs4.Tag, output_tag: bs4.Tag, output_soup: bs4.
                         # Menu reference
 
                         link_ref_id = input_child['href'][10:]
-
+                        print('link ref: ', link_ref_id)
                         menu_reference_tag = output_soup.new_tag('a')
                         menu_reference_tag['href'] = '/{}'.format(link_ref_id)
                         menu_reference_tag['class'] = ['doc-ref']
@@ -616,8 +616,8 @@ def convert_document2(input_tag: bs4.Tag, output_tag: bs4.Tag, output_soup: bs4.
                         link_ref_id = input_child['href'][10:]
 
                         page_reference_tag = output_soup.new_tag('a')
-                        page_reference_tag['href'] = 'javascript:void(0)'
-                        page_reference_tag['onclick'] = 'open_doc({})'.format(link_ref_id)
+                        page_reference_tag['href'] = '/{}'.format(link_ref_id)
+                        page_reference_tag['class'] = ['doc-ref']
 
                         output_tag.append(page_reference_tag)
                         convert_document2(input_child, page_reference_tag, output_soup)
@@ -662,10 +662,14 @@ logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
 
 dt_start = datetime.datetime.now()
 
-for file_path in sorted(doc_files):
+for file in sorted(doc_files):
+    file_path = os.path.join(TMP_DIRECTORY, LANGUAGE, file)
     doc_count += 1
-    print('Processing {} ({} of {})'.format(file_path, doc_count,
-                                            len(doc_files)))
+    print('Processing {} ({} of {})'.format(file_path, doc_count, len(doc_files)))
+
+    if os.path.isfile(os.path.join(DIRECTORY, '{}l'.format(file))):
+        print('File found, skipping')
+        continue
 
     doc_id = os.path.splitext(os.path.basename(file_path))[0][3:]
     doc_title = None
@@ -721,7 +725,7 @@ for file_path in sorted(doc_files):
 
     # html_source = htmlmin.minify(html_source, remove_comments=True)
 
-    with open('{}l'.format(file_path), 'w', encoding='utf-8') as f:
+    with open(os.path.join(DIRECTORY, '{}l'.format(file)), 'w', encoding='utf-8') as f:
         f.write(html_source)
 
 dt_end = datetime.datetime.now()
@@ -729,7 +733,6 @@ elapsed_seconds = (dt_end - dt_start).total_seconds()
 
 print('Processed {} files'.format(doc_count))
 if img_fail_count > 0:
-    print('Failed to find {} image(s) (total {}): {}'
-          .format(img_fail_count, img_count, ', '.join(img_fail_list)))
+    print('Failed to find {} image(s) (total {}): {}'.format(img_fail_count, img_count, ', '.join(img_fail_list)))
 
 print('Execution time: {}s'.format(elapsed_seconds))
