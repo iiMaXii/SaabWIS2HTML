@@ -3,7 +3,7 @@
 import os
 import zipfile
 import re
-import pycountry
+
 
 def integers_to_string(integer_list):
     result = ''
@@ -38,6 +38,77 @@ class InvalidWISCD(Exception):
 
 class SaabWISCD:
     _views_regex = re.compile('^(.*? \(\d+\))([\d]{4})(\w*?)([\w]{2})\.xml$')
+    _languages = {
+        'de': 'German',
+        'es': 'Spanish',
+        'fi': 'Finnish',
+        'fr': 'French',
+        'gb': 'International English',
+        'it': 'Italian',
+        'jp': 'Japanese',
+        'kr': 'Korean',
+        'nl': 'Dutch',
+        'ru': 'Russian',
+        'sc': 'Simplified Chinese',
+        'se': 'Swedish',
+        'tc': 'Traditional Chinese',
+        'th': 'Thai',
+    }
+
+    # Found in setup in Select default market
+    _country = {
+        'ae': 'United Arab Emirates',
+        'ar': 'Argentina',
+        'at': 'Austria',
+        'au': 'Australia',
+        'be': 'Belgium/Luxembourg',
+        'bh': 'Bahrain',
+        'ca': 'Canada',
+        'ch': 'Switzerland',
+        'cl': 'Chile',
+        'cn': 'China',
+        'cr': 'Czech Republic',
+        'cy': 'Cyprus',
+        'de': 'Germany',
+        'dk': 'Denmark',
+        'es': 'Spain',
+        'ee': 'Estonia',
+        'fi': 'Finland',
+        'fr': 'France',
+        'gb': 'Great Britain',
+        'gr': 'Greece',
+        'hk': 'Hong Kong',
+        'hu': 'Hungary',
+        'ie': 'Ireland',
+        'el': 'Israel',
+        'is': 'Iceland',
+        'it': 'Italy',
+        'jo': 'Jordan',
+        'jp': 'Japan',
+        'kr': 'Republic of Korea',
+        'kw': 'Kuwait',
+        'lb': 'Lebanon',
+        'lv': 'Latvia',
+        'lt': 'Lithuania',
+        'mt': 'Malta',
+        'my': 'Malaysia',
+        'nl': 'Holland',
+        'no': 'Norway',
+        'om': 'Oman',
+        'pl': 'Poland',
+        'pt': 'Portugal',
+        'qa': 'Qatar',
+        'ru': 'Russia',
+        'sa': 'Saudi Arabia',
+        'se': 'Sweden',
+        'sg': 'Singapore',
+        'th': 'Thailand',
+        'tr': 'Turkey',
+        'tw': 'Taiwan',
+        'us': 'United States',
+        'za': 'South Africa',
+        'zn': 'New Zealand',
+    }
 
     @staticmethod
     def is_valid_wis_cd(directory):
@@ -60,7 +131,7 @@ class SaabWISCD:
         self.directory = directory
 
         # Grab information from the CD
-        self.languages = set()  # TODO Assumes all languages exists for all models
+        self.languages = set()  # Assumes all languages exists for all models
         self.models = {}
 
         for model_directory in os.listdir(self.directory):
@@ -72,7 +143,7 @@ class SaabWISCD:
                 current_models = {}
                 for f in z.namelist():
                     match = SaabWISCD._views_regex.match(f)
-                    print(f)
+
                     if not match:
                         raise InvalidWISCD()
 
@@ -92,24 +163,20 @@ class SaabWISCD:
             for model, model_years in current_models.items():
                 self.models['{} {}'.format(model, integers_to_string(model_years))] = model_directory
 
-            print(self.models)
-            print(self.languages)
-
     def get_models(self):
-        return list(self.models.keys())
+        return sorted(list(self.models.keys()))
 
     def get_languages(self):
-        return list(self.languages)
+        return sorted(list(self.languages))
 
-    def get_language_full(self):
+    def get_languages_full(self):
         languages_full = []
-        for l in self.languages:
-            try:
-                languages_full.append(pycountry.languages.get(alpha_2=l).name)
-            except KeyError:
-                languages_full.append('Unknown ({})'.format(l))
+        for lang_code in self.languages:
+            language = self._languages.get(lang_code, '???')
 
-        return languages_full
+            languages_full.append('{} ({})'.format(language, lang_code.upper()))
+
+        return sorted(languages_full)
 
 
 if __name__ == '__main__':

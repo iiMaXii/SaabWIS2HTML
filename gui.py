@@ -43,11 +43,10 @@ class TitledPage(wiz.WizardPageSimple):
         sizer.Add(wx.StaticLine(self, -1), 0, wx.EXPAND | wx.ALL, 5)
 
 
-class Page2(TitledPage):
+class SelectWISCDPage(TitledPage):
     def __init__(self, parent):
         TitledPage.__init__(self, parent, 'Select Saab WIS CD')
 
-        self.valid_path = False
         self.directory_dialog = wx.DirDialog(self, 'Select WIS CD directory', '', wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST)
 
         self.sizer.Add(wx.StaticText(self, -1, "\nPlease select the location of the Saab WIS CD drive"))
@@ -63,70 +62,74 @@ class Page2(TitledPage):
 
         self.sizer.Add(wis_browse_sizer, 0, wx.EXPAND)
 
-        """
-        select_model_language_grid = wx.FlexGridSizer(2, 3, 1, 1)  # TODO
-        select_model_language_grid.AddGrowableRow(1)
-        #select_model_language_grid.AddGrowableCol(1)
-        #select_model_language_grid.SetFlexibleDirection(wx.HORIZONTAL)
-
-        select_model_language_grid.Add(wx.StaticText(self, -1, "\nSelect model(s)"))
-        select_model_language_grid.Add(wx.StaticText(self, -1, "\nSelect language(s)"), 0, wx.ALIGN_RIGHT)
-        select_model_language_grid.AddStretchSpacer()
-
-        self.select_model_check_list_box = wx.CheckListBox(self)
-        self.select_language_check_list_box = wx.CheckListBox(self)
-        select_model_language_grid.Add(self.select_model_check_list_box, 1, wx.EXPAND)
-        select_model_language_grid.Add(self.select_language_check_list_box, 1, wx.ALIGN_RIGHT|wx.EXPAND)
-        select_model_language_grid.AddStretchSpacer()
-
-        self.sizer.Add(select_model_language_grid, 1, wx.EXPAND)
-        """
-
         # Create sizers
-        select_model_language_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.select_model_language_sizer = wx.BoxSizer(wx.HORIZONTAL)
         select_model_sizer = wx.BoxSizer(wx.VERTICAL)
         select_language_sizer = wx.BoxSizer(wx.VERTICAL)
 
         # Select model
         select_model_sizer.Add(wx.StaticText(self, -1, "\nSelect model(s)"))
-        self.model_check_list_box = wx.CheckListBox(self)
+        self.model_check_list_box = wx.CheckListBox(self, size=(180, -1))
         select_model_sizer.Add(self.model_check_list_box, 1)
 
         # Select language
         select_language_sizer.Add(wx.StaticText(self, -1, "\nSelect language(s)"))
-        self.language_check_list_box = wx.CheckListBox(self)
+        self.language_check_list_box = wx.CheckListBox(self, size=(180, -1))
         select_language_sizer.Add(self.language_check_list_box, 1)
 
-        select_model_language_sizer.Add(select_model_sizer, 0, wx.EXPAND)
-        select_model_language_sizer.AddStretchSpacer()
-        select_model_language_sizer.Add(select_language_sizer, 0, wx.EXPAND)
-        self.sizer.Add(select_model_language_sizer, 1, wx.EXPAND)
+        self.select_model_language_sizer.Add(select_model_sizer, 0, wx.EXPAND)
+        self.select_model_language_sizer.AddStretchSpacer()
+        self.select_model_language_sizer.Add(select_language_sizer, 0, wx.EXPAND)
+        self.sizer.Add(self.select_model_language_sizer, 1, wx.EXPAND)
+
+        # Hide model and language selectors
+        self.select_model_language_sizer.ShowItems(False)
+
+        self.Bind(wx.EVT_CHECKLISTBOX, self.on_checkbox)
+
+    def _toggle_next_button(self):
+        forward_button = self.FindWindowById(wx.ID_FORWARD)
+        if self.model_check_list_box.GetCheckedItems() and self.language_check_list_box.GetCheckedItems():
+            forward_button.Enable()
+        else:
+            forward_button.Disable()
+
+    def on_checkbox(self, event):
+        self._toggle_next_button()
+
+        model_checked = self.model_check_list_box.GetCheckedItems()
+        language_checked = self.language_check_list_box.GetCheckedItems()
+
+        if event.EventObject == self.model_check_list_box:
+            print(model_checked)
+        elif event.EventObject == self.language_check_list_box:
+            print(language_checked)
 
     def display_dialog(self, event):
         if self.directory_dialog.ShowModal() == wx.ID_OK:
             path = self.directory_dialog.GetPath()
             if wis_cd.SaabWISCD.is_valid_wis_cd(path):
                 self.wis_location_text_ctrl.SetValue(path)
-                #self.FindWindowById(wx.ID_FORWARD).Enable()
 
                 cd = wis_cd.SaabWISCD(path)
 
                 self.model_check_list_box.Set(cd.get_models())
-                self.language_check_list_box.Set(cd.get_languages())
+                self.language_check_list_box.Set(cd.get_languages_full())
+
+                self.select_model_language_sizer.ShowItems(True)
+                self.Layout()
             else:
                 wx.MessageBox('Could not recognize the selected directory as a Saab WIS CD',
                               'Error', wx.OK | wx.ICON_EXCLAMATION)
 
     def on_enter(self):
-        self.FindWindowById(wx.ID_FORWARD).Disable()
-        #if Page2.is_valid_cd_directory(self.directory_dialog.GetPath()):
-        #    self.FindWindowById(wx.ID_FORWARD).Enable()
+        self._toggle_next_button()
 
     def on_exit(self):
         self.FindWindowById(wx.ID_FORWARD).Enable()
 
 
-class Page3(TitledPage):
+class CoolUtilsDetectPage(TitledPage):
     def __init__(self, parent):
         TitledPage.__init__(self, parent, 'CoolUtils CAD ConverterX')
 
@@ -159,7 +162,8 @@ class Page3(TitledPage):
             self.FindWindowById(wx.ID_FORWARD).Enable()
             self.program_detected_text_ctrl.SetLabelText('\nTotal CAD ConverterX has been detected.')
         else:
-            self.program_detected_text_ctrl.SetLabelText('\nUnable to find Total CAD ConverterX, please install it to continue.')
+            self.program_detected_text_ctrl.SetLabelText('\nUnable to find Total CAD ConverterX, please install it to'
+                                                         'continue.')
             self.dependency_check_thread = threading.Thread(target=self.check_dependency)
             self.dependency_check_thread.start()
 
@@ -167,17 +171,60 @@ class Page3(TitledPage):
         self.FindWindowById(wx.ID_FORWARD).Enable()
 
 
+class SelectInstallDirectoryPage(TitledPage):
+    def __init__(self, parent):
+        TitledPage.__init__(self, parent, 'Select installation directory')
+
+        self.directory_dialog = wx.DirDialog(self, 'Select install directory', '%programfiles%/SaabWIS_HTML5',
+                                             wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST)
+
+        self.sizer.Add(wx.StaticText(self, -1, "\nPlease select the install location"))
+        wis_browse_sizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        self.wis_location_text_ctrl = wx.TextCtrl(self, -1)
+        self.wis_location_text_ctrl.Disable()
+        wis_browse_sizer.Add(self.wis_location_text_ctrl, 1, wx.EXPAND)
+
+        browse_button = wx.Button(self, -1, "Browse")
+        browse_button.Bind(wx.EVT_BUTTON, self.display_dialog)
+        wis_browse_sizer.Add(browse_button)
+
+        self.sizer.Add(wis_browse_sizer, 0, wx.EXPAND)
+
+    def display_dialog(self, event):
+        if self.directory_dialog.ShowModal() == wx.ID_OK:
+            path = self.directory_dialog.GetPath()
+            print(path)
+            """if wis_cd.SaabWISCD.is_valid_wis_cd(path):
+                self.wis_location_text_ctrl.SetValue(path)
+
+                cd = wis_cd.SaabWISCD(path)
+
+                self.model_check_list_box.Set(cd.get_models())
+                self.language_check_list_box.Set(cd.get_languages_full())
+
+                self.select_model_language_sizer.ShowItems(True)
+                self.Layout()
+            else:
+                wx.MessageBox('Could not recognize the selected directory as a Saab WIS CD',
+                              'Error', wx.OK | wx.ICON_EXCLAMATION)"""
+
+    #def on_enter(self):
+    #    self._toggle_next_button()
+
+    #def on_exit(self):
+    #    self.FindWindowById(wx.ID_FORWARD).Enable()
+
 class SaabWizard(wx.adv.Wizard):
     def __init__(self):
         super(wx.adv.Wizard, self).__init__(None, -1, 'Saab WIS HTML5 installer', bitmap=wx.Bitmap('saab_wizard_logo.png'))
         self.page1 = TitledPage(self, "Welcome")
-        self.page2 = Page2(self)
-        self.page3 = Page3(self)
-        self.page4 = TitledPage(self, "Select model and language")
-        self.page5 = TitledPage(self, "Select installation directory")
-        self.page6 = TitledPage(self, "Installation is ready to commence")
-        self.page7 = TitledPage(self, "Installing")
-        self.page8 = TitledPage(self, "Done")
+        self.page2 = SelectWISCDPage(self)
+        self.page3 = CoolUtilsDetectPage(self)
+        self.page4 = SelectInstallDirectoryPage(self)
+        self.page5 = TitledPage(self, "Installation is ready to commence")
+        self.page6 = TitledPage(self, "Installing")
+        self.page7 = TitledPage(self, "Done")
 
         self.FitToPage(self.page1)
         self.page1.sizer.Add(
@@ -224,7 +271,6 @@ class SaabWizard(wx.adv.Wizard):
         self.Destroy()
 
 
-# ----------------------------------------------------------------------
 if __name__ == "__main__":
     app = wx.App(False)
     wizard = SaabWizard()
