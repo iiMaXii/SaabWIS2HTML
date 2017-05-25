@@ -29,3 +29,7 @@ img {
     background: url('/static/img/loading.svg') no-repeat;
     background-position: center;
 }
+
+.nav > li > a {
+  padding: 10px 15px;
+}
