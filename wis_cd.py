@@ -1,4 +1,5 @@
-#!/usr/bin/env python3
+""" API for accessing the Saab WIS CD.
+"""
 
 import os
 import zipfile

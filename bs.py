@@ -1,15 +1,11 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-"""
-bs for beautiful soup the library being used, alternatively bs could mean
-bullshit for the internet explorer shit code that was used to make the Saab WIS
+""" This file converts all relevant HTML documents on the Saab WIS CD to HTML5
+documents.
 """
 
 import logging
 import sys
 import os
-import htmlmin
+# import htmlmin
 import datetime
 import re
 import json

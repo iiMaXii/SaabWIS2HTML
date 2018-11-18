@@ -1,5 +1,5 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+""" Generate link lookup tables depending on car model and year.
+"""
 
 """
 Directory structure: 

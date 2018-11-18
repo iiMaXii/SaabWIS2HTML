@@ -1,14 +1,12 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+""" Graphical user interface that will guide the user though the installation
+process.
+"""
 
 import wx
 import wx.adv as wiz
 import win32api
-import os
 import threading
 import time
-
-import coolutils
 import wis_cd
 
 # http://stackoverflow.com/questions/827371/is-there-a-way-to-list-all-the-available-drive-letters-in-python
