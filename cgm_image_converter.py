@@ -97,7 +97,8 @@ class CGMImageConverter(Thread):
         self._workers = []  # type: List[Process]
         self._image_queue_priority = Queue()
         self._image_queue = Queue()
-        self._images = {}  # type: Dict[str]
+        self._images = {}  # type: Dict[str, str]
+        self._total_image_count = 0
 
         for file in glob.glob(os.path.join(input_directory, '*.cgm')):
             if skip_existing:
@@ -111,6 +112,7 @@ class CGMImageConverter(Thread):
 
             _log.debug('Adding {} to queue'.format(file))
             self._add_item(file)
+            self._total_image_count += 1
 
     def prioritize(self, filename: str):
         """ Prioritize the conversion of an image.
@@ -126,6 +128,12 @@ class CGMImageConverter(Thread):
         """ Stop the thread and its sub-processes gracefully.
         """
         self._running = False
+
+    def get_progress(self):
+        return 1 - (self._image_queue.qsize() / self._total_image_count)
+
+    def is_done(self):
+        return self._image_queue.empty()
 
     def run(self):
         while self._running:

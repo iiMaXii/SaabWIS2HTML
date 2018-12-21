@@ -106,7 +106,7 @@ class SelectWISCDPage(TitledPage):
     def display_dialog(self, event):
         if self.directory_dialog.ShowModal() == wx.ID_OK:
             path = self.directory_dialog.GetPath()
-            if wis_cd.SaabWISCD.is_valid_wis_cd(path):
+            if wis_cd.SaabWISCD._is_valid_wis_cd(path):
                 self.wis_location_text_ctrl.SetValue(path)
 
                 cd = wis_cd.SaabWISCD(path)
